@@ -1,0 +1,79 @@
+/**
+ * 浮层页面样式。
+ *
+ * 三件事：
+ *   1. 外壳透明（桌面要透出来）、铺满、不要滚动条、不选中文字；
+ *   2. Canvas 铺满整屏（频谱画在正中间）；
+ *   3. CRT 质感：**扫描线 + 暗角 + 轻微闪烁**（静态覆盖层，纯 CSS，几乎不花性能）。
+ *
+ * ⚠ `html.idle #stage { display:none }` 不是可有可无的优化：浮层页启动时就预加载，
+ *    不显示时若还挂着动画/合成，Chromium 会一直出帧、白烧 CPU（尤其是解锁了帧率上限时）。
+ */
+
+html, body {
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  height: 100%;
+  /* 背景色 / 不透明度由 Python 推来（`--vs-bg`，见 overlay.js）；没设就是全透明 */
+  background: var(--vs-bg, transparent) !important;
+  overflow: hidden;
+  user-select: none;
+  cursor: none;
+}
+
+#stage {
+  position: fixed;
+  inset: 0;
+}
+
+html.idle #stage {
+  display: none;
+}
+
+#spectrum {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+/* ---- CRT 覆盖层：扫描线 + 暗角 + 轻微闪烁 ----
+ *
+ *  ⚠ **只有设了背景（不透明度 > 0）且 CRT 开关开着时才显示**。它是“屏幕”的效果，得有个屏幕可贴；
+ *    没背景（完全透明）时如果还铺一层扫描线/暗角，整屏就会发青发灰 —— 看着就像
+ *    “明明不透明度是 0、怎么还有背景色”。`crt-on` 由 overlay.js 按设置挂上。
+ */
+.crt {
+  display: none;
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  /* 扫描线：3px 一周期，很淡 */
+  background-image: repeating-linear-gradient(
+    to bottom,
+    rgba(120, 232, 255, 0.05) 0px,
+    rgba(120, 232, 255, 0.05) 1px,
+    transparent 1px,
+    transparent 3px
+  );
+  /* 暗角：四周压暗一点点，中心留亮 */
+  box-shadow: inset 0 0 22vw 8vw rgba(0, 0, 0, 0.28);
+  mix-blend-mode: screen;
+  animation: crt-flicker 4.5s steps(60) infinite;
+}
+
+html.crt-on .crt { display: block; }
+
+@keyframes crt-flicker {
+  0%, 100% { opacity: 0.9; }
+  48% { opacity: 0.86; }
+  49% { opacity: 1; }
+  50% { opacity: 0.88; }
+  72% { opacity: 0.93; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .crt { animation: none; }
+}

@@ -1,0 +1,22 @@
+# VisualSpectrum —— conda 环境定义（本机开发用）
+#
+#   conda env create -f environment.yml         # 首次创建（会建出 VSp 环境）
+#   conda env update -f environment.yml --prune # 改了依赖后同步
+#
+# 依赖统一用 pip 装（不是 conda install）：PyQt6 / soundcard 在 PyPI 上轮子更新最快。
+# 运行任何命令都不要污染当前 shell，用：
+#   conda run -n VSp python run.py
+name: VSp
+channels:
+  - defaults
+dependencies:
+  - python=3.12
+  - pip
+  - pip:
+      - PyQt6>=6.11
+      - PyQt6-WebEngine>=6.11
+      - Flask>=3.1
+      - numpy>=1.26
+      - soundcard>=0.4.3
+      - pytest>=8.0
+      - ruff>=0.6
