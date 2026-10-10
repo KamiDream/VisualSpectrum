@@ -48,6 +48,7 @@ const els = {
   colors: $('#colors'),
   addColor: $('#add-color'),
   settingsTabs: $('#settings-tabs'),
+  pageTitle: $('#page-title'),
   bgColor: $('#bg-color'),
   bgOpacity: $('#bg-opacity'),
   bgOpacityVal: $('#bg-opacity-val'),
@@ -306,13 +307,18 @@ function showToast(message, kind = 'info', ttl = 3500) {
 /* ------------------------------------------------------------------ 事件 */
 
 function wire() {
-  //: 设置卡的菜单栏（tabs）：点哪块就只显示哪块。
+  //: 设置卡的侧边栏导航：点哪块就只显示哪块，并同步卡片顶部那张「居中标题」。
   const tabButtons = [...els.settingsTabs.querySelectorAll('button[data-tab]')]
   const tabPanels = [...document.querySelectorAll('.tab-panel')]
   const showTab = (tab) => {
     for (const button of tabButtons) button.classList.toggle('on', button.dataset.tab === tab)
     for (const panel of tabPanels) panel.hidden = panel.dataset.panel !== tab
+    const label = tabButtons.find((b) => b.dataset.tab === tab)
+      ?.querySelector('.nav-txt b')?.textContent?.trim()
+    if (label && els.pageTitle) els.pageTitle.textContent = label
   }
+  // 初始标题与默认选中的那一栏对上（HTML 里默认为「显示设置」）
+  showTab(tabButtons.find((button) => button.classList.contains('on'))?.dataset.tab ?? 'display')
   els.settingsTabs.addEventListener('click', (event) => {
     const button = event.target.closest('button[data-tab]')
     if (button) showTab(button.dataset.tab)
