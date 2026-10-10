@@ -71,6 +71,9 @@ def meta():
         running=ctx.controller is not None,
         mode=str(appearance_of(ctx.store.data).get("mode", "top")),
         live=bool(spectrum["live"]) if spectrum else False,
+        overlay_visible=(bool(ctx.controller.overlay_visible())
+                         if ctx.controller is not None
+                         and hasattr(ctx.controller, "overlay_visible") else None),
         source=str(spectrum["source"]) if spectrum else "（配置页独立运行）",
         limits={"size": list(SIZE_RANGE), "count": list(COUNT_RANGE),
                 "height": list(HEIGHT_RANGE), "intensity": list(INTENSITY_RANGE),
@@ -95,6 +98,32 @@ def spectrum():
     if ctx.controller is None or not hasattr(ctx.controller, "latest_spectrum"):
         return _ok(bands=[], live=False, source="（配置页独立运行）", running=False)
     return _ok(**ctx.controller.latest_spectrum())
+
+
+# --------------------------------------------------------------------------
+# 浮层显示 / 隐藏
+# --------------------------------------------------------------------------
+
+@bp.post("/overlay")
+def overlay_control():
+    """显示 / 隐藏桌面浮层 —— 也就是"把可视化关了之后怎么再唤回来"那条路。
+
+    body 可选：`{"visible": true}` 显示、`{"visible": false}` 隐藏；不给 body 就**切换**。
+    ⚠ 与保存一样，只发信号（`request_overlay`），真正的 show/hide 排到主线程做 ——
+      在 Flask 线程里直接 show/hide Qt 窗口有风险。
+    """
+    ctx = _context()
+    payload = request.get_json(silent=True) or {}
+    visible = payload.get("visible", None)
+    if visible is not None and not isinstance(visible, bool):
+        return _fail("visible 需要是 true / false（不传则切换）")
+    if ctx.controller is None:
+        return _ok(supported=False, note="配置页独立运行，没有浮层可控制")
+    request_overlay = getattr(ctx.controller, "request_overlay", None)
+    if request_overlay is None:
+        return _fail("当前版本不支持远程控制浮层", 501)
+    request_overlay(visible)
+    return _ok(supported=True, requested=visible)
 
 
 # --------------------------------------------------------------------------

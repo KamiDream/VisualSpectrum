@@ -33,6 +33,11 @@ class OverlayController(QObject):
     #: 从**别的线程**（Flask 配置页）请求重载。Qt 对象只能在主线程碰，所以这里
     #: 只发一个信号，真正的重载由主线程的槽 `_on_reload_requested` 跑。
     reloadRequested = pyqtSignal(str)
+    #: 从别的线程（配置页）请求显示/隐藏浮层：`True`/`False`，或 `None` = 切换。
+    #: 同样只能发信号 —— 真正的 show/hide 由主线程的槽 `_on_overlay_requested` 跑。
+    overlayRequested = pyqtSignal(object)
+    #: 浮层显示状态变化（`True`=显示了）—— 转发自窗口，给托盘同步用。
+    overlayVisibilityChanged = pyqtSignal(bool)
 
     def __init__(self, store: ConfigStore, parent: QObject | None = None) -> None:
         super().__init__(parent)
@@ -46,9 +51,15 @@ class OverlayController(QObject):
                                    device=str(self._audio.get("device", "auto")),
                                    gains=self._gains())
         self._window = OverlayWindow(mode=self._mode(), appearance=self._appearance)
+        #: 浮层是否可见（**在主线程维护的一个普通 bool**）—— 给 Flask 线程读的。
+        #: ⚠ 不能从 Flask 线程直接调 `_window.isVisible()`（碰 Qt widget 有风险），所以缓存一份。
+        self._overlay_visible = False
 
         # 跨线程重载：信号发出去 → 排到主线程的事件循环里执行（这是 Qt 的 AutoConnection）
         self.reloadRequested.connect(self._on_reload_requested)
+        self.overlayRequested.connect(self._on_overlay_requested)
+        # 窗口显示 / 隐藏（含被关闭拦成隐藏）→ 更新缓存 + 转发给托盘
+        self._window.visibilityChanged.connect(self._on_window_visibility)
 
         self._frame_timer = QTimer(self)
         self._frame_timer.setInterval(FRAME_MS)
@@ -91,6 +102,46 @@ class OverlayController(QObject):
         self._engine.stop()
         self._window.dispose()
         self._running = False
+
+    # ------------------------------------------------------------------ 显示 / 隐藏
+    def show_overlay(self) -> None:
+        """重新显示浮层（关掉之后从托盘 / 配置页唤回来）。**只能在主线程调。**"""
+        self._window.show_overlay()
+        self.statusChanged.emit(self.status_text())
+
+    def hide_overlay(self) -> None:
+        """隐藏浮层（但它继续在后台跑着 —— 再 show 就回来了）。"""
+        self._window.hide()
+
+    def toggle_overlay(self) -> None:
+        if self._overlay_visible:
+            self.hide_overlay()
+        else:
+            self.show_overlay()
+
+    def overlay_visible(self) -> bool:
+        """浮层当前是否可见 —— **线程安全**（读缓存，不碰 Qt widget）。"""
+        return bool(self._overlay_visible)
+
+    def request_overlay(self, visible: bool | None = None) -> None:
+        """**线程安全**：请求显示（`True`）/ 隐藏（`False`）/ 切换（`None`）浮层。
+
+        ⚠ 与 `request_reload` 同理：Flask 跑在后台线程，show/hide 只能排到主线程做。
+        """
+        self.overlayRequested.emit(visible)
+
+    def _on_overlay_requested(self, visible: object) -> None:
+        if visible is None:
+            self.toggle_overlay()
+        elif visible:
+            self.show_overlay()
+        else:
+            self.hide_overlay()
+
+    def _on_window_visibility(self, visible: bool) -> None:
+        self._overlay_visible = bool(visible)
+        self.overlayVisibilityChanged.emit(self._overlay_visible)
+        self.statusChanged.emit(self.status_text())
 
     # ------------------------------------------------------------------ 帧
     def _push_frame(self) -> None:
@@ -157,9 +208,11 @@ class OverlayController(QObject):
             "live": bool(snapshot["live"]),
             "source": str(snapshot["source"]),
             "running": self._running,
+            "overlay_visible": self.overlay_visible(),
             "appearance": dict(self._appearance),
         }
 
     def status_text(self) -> str:
-        return (f"模式 {self._mode()} · 大小 {self._appearance['size']}% · "
+        base = (f"模式 {self._mode()} · 大小 {self._appearance['size']}% · "
                 f"数量 {self._appearance['count']}")
+        return base if self._overlay_visible else f"{base} · 已隐藏"

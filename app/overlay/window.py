@@ -14,7 +14,7 @@
 
 from __future__ import annotations
 
-from PyQt6.QtCore import QRect, Qt
+from PyQt6.QtCore import QRect, Qt, pyqtSignal
 from PyQt6.QtGui import QGuiApplication
 from PyQt6.QtWidgets import QWidget
 
@@ -50,7 +50,14 @@ class OverlayWindow(QWidget):
     """整屏浮层：一扇透明窗 + 里面一层 `QtWebEngine`。
 
     生命周期：建一次，反复用 —— `configure()` 改大小/数量/模式，`publish()` 推每一帧。
+
+    ⚠ **关掉 = 藏起来，不是销毁**：窗口管理器的“关闭”会走 `closeEvent`，这里把它拦成
+      `hide()`（`event.ignore()`）—— 窗口对象继续留着，之后从托盘 / 配置页还能再唤回来。
+      这样才能避免“把可视化关了就没手段再打开，只能重启程序”。
     """
+
+    #: 显示 / 隐藏变化时发出来（`True`=显示了）—— 托盘据此同步「显示可视化」的勾选态。
+    visibilityChanged = pyqtSignal(bool)
 
     def __init__(self, *, mode: str = MODE_TOP, appearance: dict | None = None,
                  parent: QWidget | None = None) -> None:
@@ -86,6 +93,21 @@ class OverlayWindow(QWidget):
         if self._web is not None:
             self._web.dispose()
             self._web = None
+
+    # ------------------------------------------------------------------ 显示 / 隐藏
+    def showEvent(self, event) -> None:          # noqa: N802 - Qt 命名
+        super().showEvent(event)
+        self.visibilityChanged.emit(True)
+
+    def hideEvent(self, event) -> None:          # noqa: N802 - Qt 命名
+        super().hideEvent(event)
+        self.visibilityChanged.emit(False)
+
+    def closeEvent(self, event) -> None:         # noqa: N802 - Qt 命名
+        """关窗口 = 藏起来，**不销毁** —— 这样日后还能再唤回来。"""
+        log.info("浮层窗口被关闭 —— 改为隐藏（可从托盘 / 配置页再唤回）")
+        event.ignore()
+        self.hide()
 
     # ------------------------------------------------------------------ 几何
     def _target_rect(self) -> QRect:

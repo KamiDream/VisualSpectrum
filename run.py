@@ -163,26 +163,41 @@ def main(argv: list[str] | None = None) -> int:
     # ---------------------------------------------------------------- 单实例
     from app.single_instance import SingleInstance
 
-    #: 配置页**实际**监听的端口；`ready` = 配置页真的起来了
+    #: 配置页**实际**监听的端口；`ready` = 配置页曾经起来过（之后靠 `_ensure_config_server` 保活）
     config_port = {"port": args.port, "ready": False}
+    #: 给"第二个实例请求打开配置页"那个回调用的控制器占位（真正的 controller 稍后才建）
+    runtime: dict = {"controller": None}
     tray_ref: list = []
+
+    def _open_config_page(*, notify: bool = False) -> None:
+        """打开配置页 —— 顺手确保它还在监听（线程挂了就地重启）；唤起不了就提示手动访问。"""
+        port = _ensure_config_server(runtime["controller"], config_port)
+        if port is None:
+            _print("  ! 配置页起不来 —— 请查看日志")
+            return
+        if not _open_config(port):
+            _print(f"  ! 没能唤起浏览器 —— 请手动打开 http://127.0.0.1:{port}/")
+        if notify and tray_ref:
+            tray_ref[0].notify("VisualSpectrum", "已经在运行 —— 已为你打开配置页")
 
     def _second_launch(_payload: bytes) -> None:
         _print("  · 又有人启动了 VisualSpectrum —— 同时只允许一个实例")
-        if config_port["ready"]:
-            _open_config(config_port["port"])
-            if tray_ref:
-                tray_ref[0].notify("VisualSpectrum", "已经在运行 —— 已为你打开配置页")
+        _open_config_page(notify=True)
 
     single = SingleInstance()
     if not single.acquire(on_message=_second_launch):
         _print("  ! VisualSpectrum 已经在运行 —— 这次不再起第二个。")
+        # 兜底：本地套接字那条路万一没打通，就自己直接再开一次配置页
+        #（第一个实例的服务器就监听在这个默认端口上）。
+        if _port_listening("127.0.0.1", args.port) and not _open_config(args.port):
+            _print(f"  ! 没能唤起浏览器 —— 请手动打开 http://127.0.0.1:{args.port}/")
         return 0
 
     # ---------------------------------------------------------------- 浮层 + 音频
     from app.controller import OverlayController
 
     controller = OverlayController(store)
+    runtime["controller"] = controller
     controller.start()
 
     # ---------------------------------------------------------------- 托盘
@@ -190,10 +205,14 @@ def main(argv: list[str] | None = None) -> int:
 
     tray = tray_mod.Tray(status=controller.status_text())
     tray_ref.append(tray)
-    tray.openConfigRequested.connect(lambda: _open_config(config_port["port"]))
+    tray.openConfigRequested.connect(lambda: _open_config_page())
+    tray.showOverlayRequested.connect(controller.show_overlay)      # 点图标 = 只显示（不隐藏）
+    tray.toggleOverlayRequested.connect(controller.toggle_overlay)  # 菜单勾选框 = 切换
     tray.reloadRequested.connect(lambda: controller.reload(reason="托盘"))
     tray.quitRequested.connect(app.quit)
     controller.statusChanged.connect(tray.set_status)
+    controller.overlayVisibilityChanged.connect(tray.set_overlay_visible)
+    tray.set_overlay_visible(controller.overlay_visible())
 
     def _on_toast(message: str) -> None:
         _print(f"  ! {message}")
@@ -256,6 +275,35 @@ def _port_free(host: str, port: int) -> bool:
     return True
 
 
+def _port_listening(host: str, port: int) -> bool:
+    """端口是不是**已经有东西在监听**（用来判断配置页还活着没，好决定要不要重启它）。"""
+    import socket
+
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as probe:
+        probe.settimeout(0.35)
+        try:
+            return probe.connect_ex((host, port)) == 0
+        except OSError:
+            return False
+
+
+def _ensure_config_server(controller, state: dict) -> int | None:
+    """确保配置页在监听：端口没人听了就（重新）起一个。返回监听端口（起不来则 `None`）。
+
+    为什么不只"起一次"就完事：配置页跑在一个后台线程里，容器/桌面环境可能在某个时刻
+    把它收掉。用户看到的现像就是"关了配置页窗口后就再也打不开，得重启程序"。
+    这里每次要打开前先探一下端口，没人听就补一个，于是**永远能打开**。
+    """
+    host = "127.0.0.1"
+    if state.get("ready") and _port_listening(host, int(state["port"])):
+        return int(state["port"])
+    chosen = _start_config_server(controller, port=int(state.get("port", 8770)))
+    if chosen is not None:
+        state["port"] = chosen
+        state["ready"] = True
+    return chosen
+
+
 def _start_config_server(controller, *, port: int) -> int | None:
     """在后台线程里起配置页（Flask）。起不来就只提示，不影响浮层。
 
@@ -286,12 +334,52 @@ def _start_config_server(controller, *, port: int) -> int | None:
     return chosen
 
 
-def _open_config(port: int) -> None:
+def _open_config(port: int) -> bool:
+    """用系统浏览器打开配置页。返回**是否成功唤起**（失败调用方应提示手动访问 URL）。
+
+    唤起浏览器这条链在 Linux 上不一定可靠（`webbrowser` 可能挑到一个不可用的后端），
+    所以这里两道：先 `webbrowser`，不行再用系统命令兜底；每次都把 URL 记进日志。
+    """
+    url = f"http://127.0.0.1:{port}/"
+    from app import log
+    log.info(f"打开配置页：{url}")
+    if _open_with_webbrowser(url):
+        return True
+    return _open_with_platform(url)
+
+
+def _open_with_webbrowser(url: str) -> bool:
+    """先用 Python 标准的 `webbrowser` —— **每次开新标签**，避开复用已退出控制器句柄的毛病。"""
     try:
         import webbrowser
-        webbrowser.open(f"http://127.0.0.1:{port}/")
-    except Exception:                            # noqa: BLE001
-        pass
+
+        try:
+            return bool(webbrowser.open_new_tab(url))
+        except Exception:                            # noqa: BLE001 - 退回老 API 再试一次
+            return bool(webbrowser.open(url))
+    except Exception:                                # noqa: BLE001
+        return False
+
+
+def _open_with_platform(url: str) -> bool:
+    """`webbrowser` 失灵时的兜底：手边常见的系统"打开 URL"命令。"""
+    import subprocess
+    import sys
+
+    if sys.platform.startswith("win"):
+        candidates = [["cmd", "/c", "start", "", url]]
+    elif sys.platform == "darwin":
+        candidates = [["open", url]]
+    else:
+        candidates = [["xdg-open", url], ["gio", "open", url], ["sensible-browser", url]]
+    for cmd in candidates:
+        try:
+            subprocess.Popen(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                             start_new_session=True)
+            return True
+        except (OSError, ValueError):
+            continue
+    return False
 
 
 if __name__ == "__main__":

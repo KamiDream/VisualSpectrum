@@ -47,13 +47,13 @@ def test_config_page_has_the_settings() -> None:
                     'id="barrel"', 'id="aberration"',
                     'id="particle-speed"', 'id="particle-life"', 'id="burst"',
                     'id="burst-sensitivity"', 'id="burst-speed"', 'id="burst-life"',
-                    'id="high-fps"',
+                    'id="high-fps"', 'id="btn-overlay"',
                     'id="delay"', 'id="device"', 'id="mix-readout"',
                     'id="settings-tabs"',
-                    'data-tab="display"', 'data-tab="mode"', 'data-tab="mix"', 'data-tab="color"',
-                    'data-tab="bg"', 'data-tab="particles"', 'data-tab="audio"',
-                    'data-panel="display"', 'data-panel="mode"', 'data-panel="mix"', 'data-panel="color"',
-                    'data-panel="bg"', 'data-panel="particles"', 'data-panel="audio"',
+                    'data-tab="display"', 'data-tab="color"', 'data-tab="motion"',
+                    'data-tab="bg"', 'data-tab="audio"', 'data-tab="window"',
+                    'data-panel="display"', 'data-panel="color"', 'data-panel="motion"',
+                    'data-panel="bg"', 'data-panel="audio"', 'data-panel="window"',
                     'data-source="system"', 'data-source="off"',
                     'data-mode="top"', 'data-mode="wallpaper"'):
         assert control in html, control

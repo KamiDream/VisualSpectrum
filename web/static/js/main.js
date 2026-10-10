@@ -76,6 +76,7 @@ const els = {
   save: $('#btn-save'),
   reload: $('#btn-reload'),
   reset: $('#btn-reset'),
+  overlay: $('#btn-overlay'),
   status: $('#status'),
   previewStatus: $('#preview-status'),
   canvas: $('#preview-canvas'),
@@ -159,6 +160,16 @@ function renderForm() {
   els.burstLifeVal.textContent = `${appearance.burst_life ?? 100}%`
   updateBurstDisabled()
   els.highFps.checked = Boolean(state.config.render?.high_fps)
+  renderOverlayButton()
+}
+
+/** 刷新「显示 / 隐藏可视化」按钮 —— 它对应桌面浮层的显示状态（来自 meta）。 */
+function renderOverlayButton() {
+  if (!els.overlay) return
+  const visible = state.meta?.overlay_visible
+  const known = typeof visible === 'boolean'
+  els.overlay.disabled = !known                 // 配置页独立运行时没有浮层可控制
+  els.overlay.textContent = (known && visible) ? '隐藏可视化' : '显示可视化'
 }
 
 /** 鼓点开关关掉时，它下面那三个滑杆都禁用。 */
@@ -288,6 +299,7 @@ async function refreshMeta() {
     state.meta = await api.meta()
     applyMeta()
     renderStatus()
+    renderOverlayButton()
   } catch (error) {
     /* meta 拿不到不影响设置面板 */
   }
@@ -540,6 +552,21 @@ function wire() {
   })
   els.reload.addEventListener('click', () => void reload().catch((e) => showToast(e.message, 'error')))
   els.reset.addEventListener('click', () => void reset().catch((e) => showToast(e.message, 'error')))
+
+  //: 显示 / 隐藏桌面浮层 —— **关了可视化窗口后从这儿再唤回来**（不必重启程序）。
+  els.overlay?.addEventListener('click', async () => {
+    const visible = state.meta?.overlay_visible
+    if (typeof visible !== 'boolean') return
+    try {
+      await api.overlay(!visible)
+      // 后端只是把请求排到主线程 —— 稍等一下再拉状态，免得读到旧的。
+      await new Promise((resolve) => setTimeout(resolve, 200))
+      await refreshMeta()
+      showToast(visible ? '已隐藏可视化' : '已显示可视化', 'info')
+    } catch (error) {
+      showToast(error.message, 'error')
+    }
+  })
 }
 
 /* ------------------------------------------------------------------ 启动 */

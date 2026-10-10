@@ -8,7 +8,9 @@ pytest.importorskip("PyQt6.QtWidgets")
 
 from PyQt6.QtCore import Qt  # noqa: E402
 
-from app.overlay.window import MODE_TOP, MODE_WALLPAPER, overlay_window_flags  # noqa: E402
+from app.overlay.window import (  # noqa: E402
+    MODE_TOP, MODE_WALLPAPER, OverlayWindow, overlay_window_flags,
+)
 
 
 def test_top_is_on_top_and_click_through() -> None:
@@ -29,3 +31,11 @@ def test_both_are_frameless_and_focusless() -> None:
         flags = overlay_window_flags(mode, "xcb")
         assert bool(flags & Qt.WindowType.FramelessWindowHint)
         assert bool(flags & Qt.WindowType.WindowDoesNotAcceptFocus)
+
+
+def test_overlay_hides_on_close_and_signals_visibility() -> None:
+    """关掉窗口 = 隐藏（不销毁），并能发出 visibilityChanged —— 这是"关了还能再唤回"的基础。"""
+    assert hasattr(OverlayWindow, "closeEvent")
+    assert hasattr(OverlayWindow, "showEvent")
+    assert hasattr(OverlayWindow, "hideEvent")
+    assert "visibilityChanged" in OverlayWindow.__dict__      # 类里自己定义的信号

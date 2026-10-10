@@ -11,14 +11,18 @@
     布局（仿参考项目 RadialMenu）：**左侧边栏导航 + 右侧内容卡片** ——
     卡片顶部是「窗口圆点 + 居中标题 + 工具条」，卡片里左设置面板 / 右实时预览。
     视觉风格保持本项目的**音乐**主题：深色录音棚底 + 五线谱 / 均衡器元素，
-    主色是 CRT 荧光的青（`--cyan`）与品红（`--magenta</title>`）双色霓虹。
+    主色是 CRT 荧光的青（cyan）与品红（magenta）双色霓虹。
+
+    侧边栏**按功能分区**（而不是按实现顺序），符合"我想调什么"的直觉：
+      显示 = 频谱长什么样 / 颜色 = 每个频率的颜色 / 动效 = 随时间动起来的东西 /
+      背景 = 背景与 CRT / 音频 = 声音从哪来 / 窗口 = 放哪儿与性能。
   -->
   <link rel="stylesheet" href="/static/css/base.css">
 </head>
 
 <body>
   <div class="app" id="app">
-    <!-- ===== 左侧边栏：品牌 + 分区导航 + 状态 ===== -->
+    <!-- ===== 左侧边栏：品牌 + 功能分区导航 + 状态 ===== -->
     <aside class="sidebar">
       <div class="side-head">
         <span class="brand-logo" aria-hidden="true">
@@ -48,28 +52,16 @@
 
       <div class="side-label">配置分区</div>
       <nav class="side-nav" id="settings-tabs" role="tablist" aria-label="设置分区">
+        <!-- 显示：频谱长什么样、怎么随声音起伏 -->
         <button type="button" role="tab" data-tab="display" class="nav-item on">
           <svg class="nav-ico" viewBox="0 0 20 20" aria-hidden="true">
             <rect x="3" y="9" width="2.6" height="8" rx="1.3"/>
             <rect x="8.7" y="3" width="2.6" height="14" rx="1.3"/>
             <rect x="14.4" y="6.5" width="2.6" height="10.5" rx="1.3"/>
           </svg>
-          <span class="nav-txt"><b>显示设置</b><i>大小 / 数量 / 条高 / 强度</i></span>
+          <span class="nav-txt"><b>显示</b><i>大小 / 数量 / 条高 / 强度</i></span>
         </button>
-        <button type="button" role="tab" data-tab="mode" class="nav-item">
-          <svg class="nav-ico" viewBox="0 0 20 20" aria-hidden="true">
-            <rect x="2.5" y="3" width="15" height="6" rx="2"/>
-            <rect x="2.5" y="11" width="15" height="6" rx="2" opacity=".5"/>
-          </svg>
-          <span class="nav-txt"><b>模式</b><i>顶层 / 壁纸</i></span>
-        </button>
-        <button type="button" role="tab" data-tab="mix" class="nav-item">
-          <svg class="nav-ico" viewBox="0 0 20 20" aria-hidden="true">
-            <circle cx="10" cy="10" r="7.5" opacity=".4"/>
-            <path d="M10 10 V2.5 A7.5 7.5 0 0 1 17.5 10 Z"/>
-          </svg>
-          <span class="nav-txt"><b>占比</b><i>低 / 中 / 高音幅度</i></span>
-        </button>
+        <!-- 颜色：按频率的一段色标 -->
         <button type="button" role="tab" data-tab="color" class="nav-item">
           <svg class="nav-ico" viewBox="0 0 20 20" aria-hidden="true">
             <circle cx="6" cy="6.5" r="2.2"/>
@@ -77,28 +69,39 @@
             <circle cx="6.5" cy="14" r="2.2"/>
             <circle cx="14" cy="13.5" r="2.2" opacity=".55"/>
           </svg>
-          <span class="nav-txt"><b>颜色</b><i>旋转 / 连线 / 色标</i></span>
+          <span class="nav-txt"><b>颜色</b><i>每个频率的色标</i></span>
         </button>
-        <button type="button" role="tab" data-tab="bg" class="nav-item">
-          <svg class="nav-ico" viewBox="0 0 20 20" aria-hidden="true">
-            <circle cx="10" cy="10" r="8" opacity=".4"/>
-            <path d="M10 2 A8 8 0 0 1 10 18 Z"/>
-          </svg>
-          <span class="nav-txt"><b>背景</b><i>颜色 / 不透明度 / CRT</i></span>
-        </button>
-        <button type="button" role="tab" data-tab="particles" class="nav-item">
+        <!-- 动效：随时间动起来的东西（旋转 / 连线 / 余晖 / 粒子 / 鼓点） -->
+        <button type="button" role="tab" data-tab="motion" class="nav-item">
           <svg class="nav-ico" viewBox="0 0 20 20" aria-hidden="true">
             <path d="M10 3 l1.9 4.6 L16.5 9.5 11.9 11.4 10 16 8.1 11.4 3.5 9.5 8.1 7.6 Z"/>
             <circle cx="16" cy="4.5" r="1.1"/>
             <circle cx="4" cy="15.5" r="1.1" opacity=".6"/>
           </svg>
-          <span class="nav-txt"><b>粒子</b><i>散射 / 鼓点扩散</i></span>
+          <span class="nav-txt"><b>动效</b><i>旋转 / 连线 / 余晖 / 粒子</i></span>
         </button>
+        <!-- 背景：背景铺色 + CRT 质感（扫描线 / 桶形 / 分色） -->
+        <button type="button" role="tab" data-tab="bg" class="nav-item">
+          <svg class="nav-ico" viewBox="0 0 20 20" aria-hidden="true">
+            <circle cx="10" cy="10" r="8" opacity=".4"/>
+            <path d="M10 2 A8 8 0 0 1 10 18 Z"/>
+          </svg>
+          <span class="nav-txt"><b>背景</b><i>铺色 / CRT / 桶形 / 分色</i></span>
+        </button>
+        <!-- 音频：声音从哪来 -->
         <button type="button" role="tab" data-tab="audio" class="nav-item">
           <svg class="nav-ico" viewBox="0 0 20 20" aria-hidden="true">
             <path d="M14 3.2 v9.1 a2.7 2.7 0 1 1-1.9-2.6 V6.6 l-6 1.3 v6.5 a2.7 2.7 0 1 1-1.9-2.6 V5.9 Z"/>
           </svg>
           <span class="nav-txt"><b>音频</b><i>来源 / 设备 / 延迟</i></span>
+        </button>
+        <!-- 窗口：放在哪儿 + 性能 -->
+        <button type="button" role="tab" data-tab="window" class="nav-item">
+          <svg class="nav-ico" viewBox="0 0 20 20" aria-hidden="true">
+            <rect x="2.5" y="3" width="15" height="6" rx="2"/>
+            <rect x="2.5" y="11" width="15" height="6" rx="2" opacity=".5"/>
+          </svg>
+          <span class="nav-txt"><b>窗口</b><i>模式 / 高刷新率</i></span>
         </button>
       </nav>
 
@@ -118,8 +121,9 @@
           <div class="tools" aria-hidden="true">
             <span class="dot red"></span><span class="dot yellow"></span><span class="dot green"></span>
           </div>
-          <div class="page-title" id="page-title">显示设置</div>
+          <div class="page-title" id="page-title">显示</div>
           <header class="toolbar">
+            <button id="btn-overlay" class="btn" title="显示 / 隐藏桌面上的可视化浮层">隐藏可视化</button>
             <button id="btn-save" class="btn primary" disabled>保存并生效</button>
             <button id="btn-reload" class="btn">重新载入</button>
             <button id="btn-reset" class="btn danger">恢复默认</button>
@@ -129,6 +133,7 @@
         <main class="layout">
           <section class="panel settings-shell">
             <div class="settings-body">
+              <!-- ===== 显示 ===== -->
               <div class="tab-panel" data-panel="display">
 
                 <div class="field">
@@ -170,36 +175,6 @@
                 </div>
 
                 <div class="field">
-                  <div class="field-head"><label>高刷新率</label></div>
-                  <label class="switch">
-                    <input id="high-fps" type="checkbox">
-                    <span class="switch-track"><span class="switch-thumb"></span></span>
-                    <span class="switch-text">解锁帧率上限（高刷屏到 120fps）</span>
-                  </label>
-                  <p class="field-hint">⚠ 改这一项要**重启**才生效（Chromium 参数在启动时读一次）。</p>
-                </div>
-
-              </div>
-
-              <div class="tab-panel" data-panel="mode" hidden>
-                <div class="field">
-                  <div class="field-head"><label>模式</label></div>
-                  <div class="segmented" role="group" aria-label="显示模式">
-                    <button type="button" data-mode="top">
-                      <b>顶层</b><i>浮在最上、鼠标穿透</i>
-                    </button>
-                    <button type="button" data-mode="wallpaper">
-                      <b>壁纸</b><i>贴到桌面、被窗口盖住</i>
-                    </button>
-                  </div>
-                  <p class="field-hint">
-                    切换会当场生效；Windows 的「壁纸」会挂进桌面层，其它平台是尽力置于底层。
-                  </p>
-                </div>
-              </div>
-
-              <div class="tab-panel" data-panel="mix" hidden>
-                <div class="field">
                   <div class="field-head"><label>低 / 中 / 高音占比</label></div>
                   <div class="mix">
                     <label><span>低</span><input id="bass" type="range" min="0" max="400" value="100"><output id="bass-val">100%</output></label>
@@ -211,9 +186,27 @@
                     不再永远打满。想突出某一块就把它调大。
                   </p>
                 </div>
+
               </div>
 
+              <!-- ===== 颜色 ===== -->
               <div class="tab-panel" data-panel="color" hidden>
+                <div class="field">
+                  <div class="field-head">
+                    <label>颜色（按频率低 → 高）</label>
+                    <button type="button" class="btn small" id="add-color">＋ 加一色</button>
+                  </div>
+                  <div class="colors" id="colors"></div>
+                  <p class="field-hint">
+                    一段色标：左端是最低频、右端是最高频，中间自动插值 —— **每个频率都有自己的颜色**。
+                    只留 1 个色就是单色。
+                  </p>
+                </div>
+              </div>
+
+              <!-- ===== 动效 ===== -->
+              <div class="tab-panel" data-panel="motion" hidden>
+
                 <div class="field">
                   <div class="field-head"><label>旋转</label></div>
                   <label class="switch">
@@ -234,47 +227,6 @@
 
                 <div class="field">
                   <div class="field-head">
-                    <label>颜色（按频率低 → 高）</label>
-                    <button type="button" class="btn small" id="add-color">＋ 加一色</button>
-                  </div>
-                  <div class="colors" id="colors"></div>
-                  <p class="field-hint">
-                    一段色标：左端是最低频、右端是最高频，中间自动插值 —— **每个频率都有自己的颜色**。
-                    只留 1 个色就是单色。
-                  </p>
-                </div>
-              </div>
-
-              <div class="tab-panel" data-panel="bg" hidden>
-                <div class="field">
-                  <div class="field-head">
-                    <label for="bg-color">背景颜色</label>
-                  </div>
-                  <input id="bg-color" type="color" value="#000000">
-                  <div class="field-head" style="margin-top:16px">
-                    <label for="bg-opacity">不透明度</label>
-                    <output id="bg-opacity-val">0%</output>
-                  </div>
-                  <input id="bg-opacity" type="range" min="0" max="100" value="0">
-                  <p class="field-hint">
-                    给整块背景铺一层纯色。0% = 全透明（桌面直接透出来，和以前一样）；调高就越来越实。
-                  </p>
-                </div>
-
-                <div class="field">
-                  <div class="field-head"><label>CRT 效果</label></div>
-                  <label class="switch">
-                    <input id="crt" type="checkbox" checked disabled>
-                    <span class="switch-track"><span class="switch-thumb"></span></span>
-                    <span class="switch-text">扫描线 + 暗角</span>
-                  </label>
-                  <p class="field-hint">
-                    它得有一块“屏幕”才贴得上 —— 所以**不透明度 > 0 时**才可开启。
-                  </p>
-                </div>
-
-                <div class="field">
-                  <div class="field-head">
                     <label for="afterglow">余晖（拖尾）</label>
                     <output id="afterglow-val">60%</output>
                   </div>
@@ -284,30 +236,6 @@
                   </p>
                 </div>
 
-                <div class="field">
-                  <div class="field-head">
-                    <label for="barrel">桶形畸变</label>
-                    <output id="barrel-val">15%</output>
-                  </div>
-                  <input id="barrel" type="range" min="0" max="100" value="15">
-                  <p class="field-hint">
-                    CRT 玻璃的那种**边缘外鼓**（WebGL 后处理，只在 WebEngine 里生效）；0 = 关。
-                  </p>
-                </div>
-
-                <div class="field">
-                  <div class="field-head">
-                    <label for="aberration">RGB 分色</label>
-                    <output id="aberration-val">30%</output>
-                  </div>
-                  <input id="aberration" type="range" min="0" max="100" value="30">
-                  <p class="field-hint">
-                    红 / 绿 / 蓝三色在边缘**错位**（色散）—— 越靠边越明显；0 = 关。
-                  </p>
-                </div>
-              </div>
-
-              <div class="tab-panel" data-panel="particles" hidden>
                 <div class="field">
                   <div class="field-head">
                     <label for="particle-speed">散射粒子 · 速度</label>
@@ -355,6 +283,59 @@
                 </div>
               </div>
 
+              <!-- ===== 背景 / CRT ===== -->
+              <div class="tab-panel" data-panel="bg" hidden>
+                <div class="field">
+                  <div class="field-head">
+                    <label for="bg-color">背景颜色</label>
+                  </div>
+                  <input id="bg-color" type="color" value="#000000">
+                  <div class="field-head" style="margin-top:16px">
+                    <label for="bg-opacity">不透明度</label>
+                    <output id="bg-opacity-val">0%</output>
+                  </div>
+                  <input id="bg-opacity" type="range" min="0" max="100" value="0">
+                  <p class="field-hint">
+                    给整块背景铺一层纯色。0% = 全透明（桌面直接透出来，和以前一样）；调高就越来越实。
+                  </p>
+                </div>
+
+                <div class="field">
+                  <div class="field-head"><label>CRT 效果</label></div>
+                  <label class="switch">
+                    <input id="crt" type="checkbox" checked disabled>
+                    <span class="switch-track"><span class="switch-thumb"></span></span>
+                    <span class="switch-text">扫描线 + 暗角</span>
+                  </label>
+                  <p class="field-hint">
+                    它得有一块“屏幕”才贴得上 —— 所以**不透明度 > 0 时**才可开启。
+                  </p>
+                </div>
+
+                <div class="field">
+                  <div class="field-head">
+                    <label for="barrel">桶形畸变</label>
+                    <output id="barrel-val">15%</output>
+                  </div>
+                  <input id="barrel" type="range" min="0" max="100" value="15">
+                  <p class="field-hint">
+                    CRT 玻璃的那种**边缘外鼓**（WebGL 后处理，只在 WebEngine 里生效）；0 = 关。
+                  </p>
+                </div>
+
+                <div class="field">
+                  <div class="field-head">
+                    <label for="aberration">RGB 分色</label>
+                    <output id="aberration-val">30%</output>
+                  </div>
+                  <input id="aberration" type="range" min="0" max="100" value="30">
+                  <p class="field-hint">
+                    红 / 绿 / 蓝三色在边缘**错位**（色散）—— 越靠边越明显；0 = 关。
+                  </p>
+                </div>
+              </div>
+
+              <!-- ===== 音频 ===== -->
               <div class="tab-panel" data-panel="audio" hidden>
 
                 <div class="field">
@@ -394,6 +375,34 @@
                   </div>
                   <input id="delay" type="range" min="0" max="10000" step="100" value="600">
                   <p class="field-hint">启动后等一会儿再打开音频设备，避开与系统/浏览器的设备抢占。</p>
+                </div>
+              </div>
+
+              <!-- ===== 窗口 ===== -->
+              <div class="tab-panel" data-panel="window" hidden>
+                <div class="field">
+                  <div class="field-head"><label>模式</label></div>
+                  <div class="segmented" role="group" aria-label="显示模式">
+                    <button type="button" data-mode="top">
+                      <b>顶层</b><i>浮在最上、鼠标穿透</i>
+                    </button>
+                    <button type="button" data-mode="wallpaper">
+                      <b>壁纸</b><i>贴到桌面、被窗口盖住</i>
+                    </button>
+                  </div>
+                  <p class="field-hint">
+                    切换会当场生效；Windows 的「壁纸」会挂进桌面层，其它平台是尽力置于底层。
+                  </p>
+                </div>
+
+                <div class="field">
+                  <div class="field-head"><label>高刷新率</label></div>
+                  <label class="switch">
+                    <input id="high-fps" type="checkbox">
+                    <span class="switch-track"><span class="switch-thumb"></span></span>
+                    <span class="switch-text">解锁帧率上限（高刷屏到 120fps）</span>
+                  </label>
+                  <p class="field-hint">⚠ 改这一项要**重启**才生效（Chromium 参数在启动时读一次）。</p>
                 </div>
               </div>
             </div>

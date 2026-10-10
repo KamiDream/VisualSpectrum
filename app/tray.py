@@ -18,7 +18,17 @@ from PyQt6.QtWidgets import QMenu, QSystemTrayIcon
 
 from . import APP_NAME
 
-__all__ = ["Tray", "is_available", "make_icon"]
+__all__ = ["Tray", "is_available", "make_icon", "activation_shows_overlay"]
+
+#: 点托盘图标会被当成"**显示可视化**"的激活原因（左键 / 中键）。
+#: ⚠ **双击故意不列** —— 多数平台双击会先发一次 `Trigger`，两个都算会触发两次。
+#: 用**名字**比（而不是 Qt 枚举），于是这个判断是纯粹函数，测试不需要建 QApplication。
+_SHOW_ON_ACTIVATION = ("Trigger", "MiddleClick")
+
+
+def activation_shows_overlay(reason_name: str) -> bool:
+    """纯函数：这个托盘激活原因要不要**显示可视化**（点图标 = 显示，不是开配置页、也不会隐藏）。"""
+    return reason_name in _SHOW_ON_ACTIVATION
 
 
 def make_icon(size: int = 64) -> QIcon:
@@ -62,6 +72,8 @@ class Tray(QObject):
 
     openConfigRequested = pyqtSignal()
     reloadRequested = pyqtSignal()
+    showOverlayRequested = pyqtSignal()
+    toggleOverlayRequested = pyqtSignal()
     quitRequested = pyqtSignal()
 
     def __init__(self, *, status: str = "") -> None:
@@ -72,11 +84,17 @@ class Tray(QObject):
         menu = QMenu()
         act_open = QAction("打开配置页", menu)
         act_open.triggered.connect(self.openConfigRequested.emit)
+        #: 显示 / 隐藏可视化（勾选态 = 当前是否显示）—— 关掉浮层后的唤回手段之一。
+        self._act_overlay = QAction("显示可视化", menu)
+        self._act_overlay.setCheckable(True)
+        self._act_overlay.setChecked(True)
+        self._act_overlay.triggered.connect(self.toggleOverlayRequested.emit)
         act_reload = QAction("重新载入配置", menu)
         act_reload.triggered.connect(self.reloadRequested.emit)
         act_quit = QAction("退出", menu)
         act_quit.triggered.connect(self.quitRequested.emit)
         menu.addAction(act_open)
+        menu.addAction(self._act_overlay)
         menu.addAction(act_reload)
         menu.addSeparator()
         menu.addAction(act_quit)
@@ -86,8 +104,10 @@ class Tray(QObject):
         self._icon.activated.connect(self._on_activated)
 
     def _on_activated(self, reason) -> None:
-        if reason == QSystemTrayIcon.ActivationReason.Trigger:
-            self.openConfigRequested.emit()
+        # 点托盘图标 = **显示可视化**（只显示、不隐藏 —— 隐藏用菜单里那个勾选框）。
+        # 不是开配置页（配置页在右键菜单里）。
+        if activation_shows_overlay(getattr(reason, "name", "")):
+            self.showOverlayRequested.emit()
 
     def show(self) -> bool:
         """能显示就显示；当前环境没有托盘宿主则返回 `False`（调用方打提示）。"""
@@ -98,6 +118,12 @@ class Tray(QObject):
 
     def set_status(self, text: str) -> None:
         self._icon.setToolTip(f"{APP_NAME}  ·  {text}" if text else APP_NAME)
+
+    def set_overlay_visible(self, visible: bool) -> None:
+        """同步「显示可视化」菜单项的勾选态（显示 / 隐藏变化时由 `run.py` 调）。"""
+        self._act_overlay.blockSignals(True)     # 程序改状态，别再触发 toggle
+        self._act_overlay.setChecked(bool(visible))
+        self._act_overlay.blockSignals(False)
 
     def notify(self, title: str, message: str) -> None:
         if self._icon.isVisible():

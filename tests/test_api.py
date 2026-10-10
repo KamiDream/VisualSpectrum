@@ -25,6 +25,7 @@ def test_meta(client) -> None:
     payload = test_client.get("/api/meta").get_json()
     assert payload["ok"] is True
     assert payload["running"] is False
+    assert payload["overlay_visible"] is None       # 没控制器 → 不知道 / 没有浮层
     assert payload["mode"] in ("top", "wallpaper")
     assert payload["limits"]["size"] == list(SIZE_RANGE)
 
@@ -89,6 +90,8 @@ class _FakeController:
     def __init__(self, store):
         self.store = store
         self.requested = []
+        self.overlay_requests = []
+        self.visible = True
 
     def request_reload(self, reason=""):
         self.requested.append(reason)
@@ -98,6 +101,12 @@ class _FakeController:
 
     def latest_spectrum(self):
         return {"bands": [0.5], "live": False, "source": "fake", "running": True}
+
+    def request_overlay(self, visible=None):
+        self.overlay_requests.append(visible)      # 只记账，真正的 show/hide 在主线程
+
+    def overlay_visible(self):
+        return self.visible
 
 
 def test_save_marshals_reload_through_the_controller(tmp_path) -> None:
@@ -112,3 +121,29 @@ def test_save_marshals_reload_through_the_controller(tmp_path) -> None:
     assert payload["ok"] is True
     assert payload["applied"] is True
     assert controller.requested == ["配置页保存"]
+
+
+def test_overlay_endpoint_requests_through_controller(tmp_path) -> None:
+    store = ConfigStore(path=tmp_path / "config.json")
+    store.load_or_default()
+    controller = _FakeController(store)
+    app = create_app(controller)
+    app.config["TESTING"] = True
+    with app.test_client() as test_client:
+        shown = test_client.post("/api/overlay", json={"visible": True}).get_json()
+        assert shown["ok"] is True and shown["requested"] is True
+        toggled = test_client.post("/api/overlay", json={}).get_json()   # 不传 = 切换
+        assert toggled["ok"] is True and toggled["requested"] is None
+        bad = test_client.post("/api/overlay", json={"visible": "yes"})
+        assert bad.status_code == 400
+        meta = test_client.get("/api/meta").get_json()
+        assert meta["overlay_visible"] is True
+    # 全部只走 request_overlay（排队到主线程），没有在 Flask 线程里直接动 Qt
+    assert controller.overlay_requests == [True, None]
+
+
+def test_overlay_endpoint_without_controller(client) -> None:
+    test_client, _store = client
+    payload = test_client.post("/api/overlay", json={"visible": False}).get_json()
+    assert payload["ok"] is True
+    assert payload["supported"] is False
