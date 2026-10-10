@@ -6,7 +6,7 @@ import pytest
 
 flask = pytest.importorskip("flask")
 
-from app.config import ConfigStore, SIZE_RANGE  # noqa: E402
+from app.config import SIZE_RANGE, ConfigStore  # noqa: E402
 from backend.app import create_app  # noqa: E402
 
 

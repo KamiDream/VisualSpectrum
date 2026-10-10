@@ -10,10 +10,15 @@ import random
 import pytest
 
 from app.audio import (
-    FFT_SIZE, SAMPLE_RATE, SpectrumProcessor, band_bins, bands_of, demo_frame, map_bands,
+    FFT_SIZE,
+    SAMPLE_RATE,
+    SpectrumProcessor,
+    band_bins,
+    bands_of,
+    demo_frame,
+    map_bands,
     region_bounds,
 )
-
 
 # -------------------------------------------------------------------------- band_bins
 

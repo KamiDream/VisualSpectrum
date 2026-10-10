@@ -7,9 +7,25 @@ import json
 import pytest
 
 from app.config import (
-    AFTERGLOW_RANGE, AUDIO_SOURCES, BG_OPACITY_RANGE, COUNT_RANGE, CRT_FX_RANGE, DELAY_RANGE,
-    HEIGHT_RANGE, INTENSITY_RANGE, MIX_RANGE, MODES, PARTICLE_RANGE, SENSITIVITY_RANGE,
-    SIZE_RANGE, ConfigError, ConfigStore, appearance_of, audio_of, default_config, render_of,
+    AFTERGLOW_RANGE,
+    AUDIO_SOURCES,
+    BG_OPACITY_RANGE,
+    COUNT_RANGE,
+    CRT_FX_RANGE,
+    DELAY_RANGE,
+    HEIGHT_RANGE,
+    INTENSITY_RANGE,
+    MIX_RANGE,
+    MODES,
+    PARTICLE_RANGE,
+    SENSITIVITY_RANGE,
+    SIZE_RANGE,
+    ConfigError,
+    ConfigStore,
+    appearance_of,
+    audio_of,
+    default_config,
+    render_of,
     validate,
 )
 

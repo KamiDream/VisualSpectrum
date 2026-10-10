@@ -22,7 +22,7 @@ import random
 import sys
 import threading
 import time
-from typing import Protocol
+from typing import Any, Protocol
 
 from . import log
 
@@ -251,7 +251,7 @@ class _Source(Protocol):
     name: str
     samplerate: int
 
-    def read(self, frames: int): ...          # -> 一帧采样（array-like）
+    def read(self, frames: int) -> Any: ...   # -> 一帧采样（array-like）
     def close(self) -> None: ...
 
 
@@ -339,7 +339,7 @@ class _SoundDeviceSource:
     """`sounddevice` 回环：Windows 走 WASAPI loopback，其它平台挑 monitor 设备。"""
 
     def __init__(self, sample_rate: int, block: int, device: str | None = None) -> None:
-        import sounddevice as sd
+        import sounddevice as sd  # pyright: ignore[reportMissingImports]
 
         extra = None
         if sys.platform == "win32":
@@ -402,7 +402,7 @@ def list_devices() -> list[dict[str, str]]:
         pass
 
     try:
-        import sounddevice as sd
+        import sounddevice as sd  # pyright: ignore[reportMissingImports]
         if sys.platform == "win32":
             for info in sd.query_devices():
                 if info.get("max_output_channels", 0) > 0:
@@ -553,7 +553,7 @@ class AudioEngine:
             self._bands = [0.0] * count
 
     # ------------------------------------------------------------------ 取数
-    def snapshot(self) -> dict[str, object]:
+    def snapshot(self) -> dict[str, Any]:
         """当前这一帧：`{"bands": [...], "live": bool, "source": 名字}`。"""
         with self._lock:
             return {"bands": list(self._bands), "live": self._live, "source": self._source_name}

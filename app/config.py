@@ -415,7 +415,11 @@ class ConfigStore:
         try:
             raw_text = self.path.read_text(encoding="utf-8")
         except FileNotFoundError:
-            raise ConfigError(f"配置文件不存在：{self.path}（可以先调 save_default() 生成一份）")
+            # 文件不存在是**预料之中**的首次启动情形 —— 用 `from None` 断开异常链，
+            # 让错误信息更干净（不然会看到一堆 "During handling of the above..."）。
+            raise ConfigError(
+                f"配置文件不存在：{self.path}（可以先调 save_default() 生成一份）"
+            ) from None
         except OSError as exc:
             raise ConfigError(f"读不了配置文件 {self.path}：{exc}") from exc
 

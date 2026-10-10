@@ -40,7 +40,8 @@ def create_app(controller=None, *, store: ConfigStore | None = None) -> Flask:
                 template_folder=str(paths.templates_dir()),
                 static_folder=str(paths.static_dir()),
                 static_url_path="/static")
-    app.json.ensure_ascii = False                  # 中文别被转成 \uXXXX
+    # 中文别被转成 \uXXXX（Flask 的 JSONProvider 桩里没列这个属性，但运行时是有它的）
+    app.json.ensure_ascii = False  # pyright: ignore[reportAttributeAccessIssue]
     app.config["SEND_FILE_MAX_AGE_DEFAULT"] = 0    # 前端没有构建产物，别缓存
 
     if controller is not None and getattr(controller, "store", None) is not None:

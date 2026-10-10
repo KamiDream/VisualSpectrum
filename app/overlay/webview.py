@@ -59,8 +59,8 @@ class WebOverlay:
         class _Page(QWebEnginePage):
             """把页面里的 console 消息转进日志 —— 浮层出问题时那是唯一的线索。"""
 
-            def javaScriptConsoleMessage(self, level, message, line, source) -> None:  # noqa: N802
-                log.debug(f"浮层页面[{level.name} 第{line}行]: {message}")
+            def javaScriptConsoleMessage(self, level, message, lineNumber, sourceID) -> None:  # noqa: N802
+                log.debug(f"浮层页面[{level.name} 第{lineNumber}行]: {message}")
 
         self.view = QWebEngineView(host)
         # 透明 + 不吃鼠标事件：这一层只负责画，指针的事与它无关。
@@ -72,6 +72,7 @@ class WebOverlay:
         page = _Page(self.view)
         page.setBackgroundColor(QColor(0, 0, 0, 0))
         settings = page.settings()
+        assert settings is not None                 # Qt 桩里 `settings()` 是 Optional；实际不会是 None
         settings.setAttribute(QWebEngineSettings.WebAttribute.ShowScrollBars, False)
         settings.setAttribute(QWebEngineSettings.WebAttribute.ScrollAnimatorEnabled, False)
         settings.setAttribute(QWebEngineSettings.WebAttribute.FocusOnNavigationEnabled, False)
@@ -122,7 +123,10 @@ class WebOverlay:
         self._run(script)
 
     def _run(self, script: str) -> None:
-        self.view.page().runJavaScript(script)
+        page = self.view.page()
+        if page is None:                            # 桩里 `page()` 是 Optional
+            return
+        page.runJavaScript(script)
 
     def set_appearance(self, appearance: dict[str, Any]) -> None:
         """推三项设置（大小 / 数量 / 模式）。"""

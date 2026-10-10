@@ -95,15 +95,17 @@ class OverlayWindow(QWidget):
             self._web = None
 
     # ------------------------------------------------------------------ 显示 / 隐藏
-    def showEvent(self, event) -> None:          # noqa: N802 - Qt 命名
+    # ⚠ PyQt6 的桩里这些回调的参数名是 `a0`；这里用更可读的 `event`，于是 Pyright 会报
+    #   "参数名不兼容" —— 那是 Qt 桩的锅，就地忽略。
+    def showEvent(self, event) -> None:          # noqa: N802  # pyright: ignore[reportIncompatibleMethodOverride]
         super().showEvent(event)
         self.visibilityChanged.emit(True)
 
-    def hideEvent(self, event) -> None:          # noqa: N802 - Qt 命名
+    def hideEvent(self, event) -> None:          # noqa: N802  # pyright: ignore[reportIncompatibleMethodOverride]
         super().hideEvent(event)
         self.visibilityChanged.emit(False)
 
-    def closeEvent(self, event) -> None:         # noqa: N802 - Qt 命名
+    def closeEvent(self, event) -> None:         # noqa: N802  # pyright: ignore[reportIncompatibleMethodOverride]
         """关窗口 = 藏起来，**不销毁** —— 这样日后还能再唤回来。"""
         log.info("浮层窗口被关闭 —— 改为隐藏（可从托盘 / 配置页再唤回）")
         event.ignore()

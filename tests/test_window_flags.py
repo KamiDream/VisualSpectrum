@@ -9,7 +9,10 @@ pytest.importorskip("PyQt6.QtWidgets")
 from PyQt6.QtCore import Qt  # noqa: E402
 
 from app.overlay.window import (  # noqa: E402
-    MODE_TOP, MODE_WALLPAPER, OverlayWindow, overlay_window_flags,
+    MODE_TOP,
+    MODE_WALLPAPER,
+    OverlayWindow,
+    overlay_window_flags,
 )
 
 

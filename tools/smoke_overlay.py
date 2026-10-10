@@ -21,7 +21,7 @@ os.environ["QTWEBENGINE_CHROMIUM_FLAGS"] = (
 _ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(_ROOT))
 
-from PyQt6.QtCore import QTimer, Qt  # noqa: E402
+from PyQt6.QtCore import Qt, QTimer  # noqa: E402
 from PyQt6.QtGui import QSurfaceFormat  # noqa: E402
 from PyQt6.QtWidgets import QApplication  # noqa: E402
 

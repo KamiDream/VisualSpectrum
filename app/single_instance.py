@@ -14,8 +14,8 @@
 from __future__ import annotations
 
 import hashlib
+from collections.abc import Callable
 from pathlib import Path
-from typing import Callable
 
 from PyQt6.QtCore import QLockFile
 from PyQt6.QtNetwork import QLocalServer, QLocalSocket

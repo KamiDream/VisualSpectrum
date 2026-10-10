@@ -24,9 +24,19 @@ from flask import Blueprint, Response, current_app, jsonify, request
 
 from app import __version__, audio, paths, selfcheck
 from app.config import (
-    AUDIO_SOURCES, BG_OPACITY_RANGE, COUNT_RANGE, DELAY_RANGE, HEIGHT_RANGE, INTENSITY_RANGE,
-    MODES, SIZE_RANGE,
-    ConfigError, appearance_of, audio_of, default_config, validate,
+    AUDIO_SOURCES,
+    BG_OPACITY_RANGE,
+    COUNT_RANGE,
+    DELAY_RANGE,
+    HEIGHT_RANGE,
+    INTENSITY_RANGE,
+    MODES,
+    SIZE_RANGE,
+    ConfigError,
+    appearance_of,
+    audio_of,
+    default_config,
+    validate,
 )
 
 bp = Blueprint("config_api", __name__, url_prefix="/api")
