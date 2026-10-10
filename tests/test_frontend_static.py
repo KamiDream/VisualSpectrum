@@ -44,6 +44,7 @@ def test_config_page_has_the_settings() -> None:
                     'id="bass"', 'id="mid"', 'id="treble"',
                     'id="rotate"', 'id="link"', 'id="colors"', 'id="add-color"',
                     'id="bg-color"', 'id="bg-opacity"', 'id="crt"', 'id="afterglow"',
+                    'id="barrel"', 'id="aberration"',
                     'id="particle-speed"', 'id="particle-life"', 'id="burst"',
                     'id="burst-sensitivity"', 'id="burst-speed"', 'id="burst-life"',
                     'id="high-fps"',

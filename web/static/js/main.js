@@ -54,6 +54,10 @@ const els = {
   crt: $('#crt'),
   afterglow: $('#afterglow'),
   afterglowVal: $('#afterglow-val'),
+  barrel: $('#barrel'),
+  barrelVal: $('#barrel-val'),
+  aberration: $('#aberration'),
+  aberrationVal: $('#aberration-val'),
   particleSpeed: $('#particle-speed'),
   particleSpeedVal: $('#particle-speed-val'),
   particleLife: $('#particle-life'),
@@ -136,6 +140,10 @@ function renderForm() {
   els.crt.disabled = (appearance.bg_opacity ?? 0) <= 0   // 没背景就没“屏幕”可贴
   els.afterglow.value = appearance.afterglow ?? 60
   els.afterglowVal.textContent = `${appearance.afterglow ?? 60}%`
+  els.barrel.value = appearance.barrel ?? 15
+  els.barrelVal.textContent = `${appearance.barrel ?? 15}%`
+  els.aberration.value = appearance.aberration ?? 30
+  els.aberrationVal.textContent = `${appearance.aberration ?? 30}%`
   applyPreviewBackground()
   els.particleSpeed.value = appearance.particle_speed ?? 100
   els.particleSpeedVal.textContent = `${appearance.particle_speed ?? 100}%`
@@ -488,6 +496,9 @@ function wire() {
   bindParticle(els.burstSpeed, els.burstSpeedVal, 'burst_speed', 20, 400)
   bindParticle(els.burstLife, els.burstLifeVal, 'burst_life', 20, 400)
   bindParticle(els.burstSensitivity, els.burstSensitivityVal, 'burst_sensitivity', 0, 100)
+  // 桶形畸变 / RGB 分色也是画布效果（WebGL 后处理）—— 预览直接看得到。
+  bindParticle(els.barrel, els.barrelVal, 'barrel', 0, 100)
+  bindParticle(els.aberration, els.aberrationVal, 'aberration', 0, 100)
 
   els.burst.addEventListener('change', () => {
     if (!state.config) return

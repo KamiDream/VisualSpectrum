@@ -234,6 +234,28 @@
                 荧光屏那种残留拖尾 —— 越大运动的光尾越长；0 = 不留余晖。
               </p>
             </div>
+
+            <div class="field">
+              <div class="field-head">
+                <label for="barrel">桶形畸变</label>
+                <output id="barrel-val">15%</output>
+              </div>
+              <input id="barrel" type="range" min="0" max="100" value="15">
+              <p class="field-hint">
+                CRT 玻璃的那种**边缘外鼓**（WebGL 后处理，只在 WebEngine 里生效）；0 = 关。
+              </p>
+            </div>
+
+            <div class="field">
+              <div class="field-head">
+                <label for="aberration">RGB 分色</label>
+                <output id="aberration-val">30%</output>
+              </div>
+              <input id="aberration" type="range" min="0" max="100" value="30">
+              <p class="field-hint">
+                红 / 绿 / 蓝三色在边缘**错位**（色散）—— 越靠边越明显；0 = 关。
+              </p>
+            </div>
           </div>
 
           <div class="tab-panel" data-panel="particles" hidden>

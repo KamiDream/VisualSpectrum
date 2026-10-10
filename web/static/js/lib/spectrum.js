@@ -43,6 +43,51 @@ function rateFor(k60) {
 const ATTACK_RATE = rateFor(0.78)
 const RELEASE_RATE = rateFor(0.32)
 
+/** 桶形畸变 / RGB 分色（WebGL 后处理）拉满时的强度。 */
+const BARREL_MAX = 0.35
+const ABERRATION_MAX = 0.0035
+
+const WARP_VERT = `
+attribute vec2 aPos;
+varying vec2 vUv;
+void main() {
+  vUv = aPos * 0.5 + 0.5;
+  gl_Position = vec4(aPos, 0.0, 1.0);
+}`
+
+// 桶形畸变 + RGB 分色一次做完（同一个后处理 pass）
+const WARP_FRAG = `
+precision mediump float;
+varying vec2 vUv;
+uniform sampler2D uScene;
+uniform float uBarrel;
+uniform float uAberration;
+void main() {
+  vec2 d = vUv - vec2(0.5);
+  float r2 = dot(d, d);
+  // 桶形：越靠边采样点越往中心收 → 画面边缘向外鼓
+  vec2 uv = vec2(0.5) + d * (1.0 - uBarrel * r2 * 4.0);
+  // RGB 分色：R 往外偏、B 往里偏，越靠边越明显
+  vec2 off = d * (uAberration * r2 * 8.0);
+  vec4 sR = texture2D(uScene, uv + off);
+  vec4 sG = texture2D(uScene, uv);
+  vec4 sB = texture2D(uScene, uv - off);
+  vec4 col = vec4(sR.r, sG.g, sB.b, max(sG.a, max(sR.a, sB.a)));
+  if (uv.x < 0.0 || uv.x > 1.0 || uv.y < 0.0 || uv.y > 1.0) col = vec4(0.0);
+  gl_FragColor = col;
+}`
+
+/** 编译一个着色器（出错就抛）。 */
+function compileShader(gl, type, source) {
+  const shader = gl.createShader(type)
+  gl.shaderSource(shader, source)
+  gl.compileShader(shader)
+  if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
+    throw new Error(gl.getShaderInfoLog(shader) || 'shader 编译失败')
+  }
+  return shader
+}
+
 /** `#RRGGBB` → `[r, g, b]`（解析不了就退成青色）。 */
 function parseHex(hex) {
   const match = /^#([0-9a-fA-F]{6})$/.exec(String(hex ?? '').trim())
@@ -117,6 +162,7 @@ export class SpectrumView {
     this.appearance = {
       size: 55, count: 96, height: 48, intensity: 100, link: true, rotate: true,
       afterglow: 60,
+      barrel: 15, aberration: 30,
       particle_speed: 100, particle_life: 100,
       burst: true, burst_sensitivity: 55, burst_speed: 100, burst_life: 100,
       colors: DEFAULT_COLORS.slice(), mode: 'top',
@@ -147,6 +193,15 @@ export class SpectrumView {
     /** 余晖（荧光拖尾）用的离屏画布（全分辨率）：不清屏，让上一帧慢慢淡出。 */
     this._trail = document.createElement('canvas')
     this._trailCtx = this._trail.getContext('2d')
+
+    /** 场景画布（全分辨率）：开了桶形/色散后处理时，先把画面画到这里，再由 WebGL 变形贴回可见画布。 */
+    this._scene = document.createElement('canvas')
+    this._sceneCtx = this._scene.getContext('2d')
+
+    /** WebGL 后处理（懒创建；起不来就退回直接贴图）。 */
+    this._warp = null
+    this._gl = null
+    this._glFailed = false
 
     this._onResize = () => this.resize()
     this._observer = typeof ResizeObserver !== 'undefined'
@@ -207,6 +262,117 @@ export class SpectrumView {
     // 余晖层跟主画布同尺寸；改尺寸会**顺便清空**它（反正要重新开始了）
     this._trail.width = this.canvas.width
     this._trail.height = this.canvas.height
+
+    // 离屏场景 / WebGL 后处理输出也是同样尺寸
+    this._scene.width = this.canvas.width
+    this._scene.height = this.canvas.height
+    if (this._warp) {
+      this._warp.width = this.canvas.width
+      this._warp.height = this.canvas.height
+    }
+  }
+
+  // ------------------------------------------------------------------ 后处理（WebGL）
+  /** 要不要走 WebGL 后处理（桶形畸变 / RGB 分色）。
+   *  只做 **WebEngine/Chromium** 这一条路：浮层本身就是 WebEngine 里的一个页面，
+   *  所以后处理放在 JS 里最省事 —— Qt 侧一行都不用动。
+   *  这里**懒创建**上下文；GL 起不来（无 WebGL / 上下文丢失）就返回 false，退回直接贴图。 */
+  _postEnabled() {
+    if (this._glFailed) return false
+    const want = Number(this.appearance.barrel ?? 0) > 0 || Number(this.appearance.aberration ?? 0) > 0
+    if (!want) return false
+    this._initWarp()
+    return !this._glFailed && !!this._gl
+  }
+
+  /** 懒创建 WebGL 后处理：一个离屏 canvas + 一个全屏四边形 + 一个 pass（桶形 + 色散）。 */
+  _initWarp() {
+    if (this._gl || this._glFailed) return
+    try {
+      const canvas = document.createElement('canvas')
+      const gl = canvas.getContext('webgl', {
+        alpha: true, premultipliedAlpha: false,
+        antialias: false, depth: false, stencil: false,
+      }) || canvas.getContext('experimental-webgl')
+      if (!gl) throw new Error('WebGL 不可用')
+
+      const program = gl.createProgram()
+      gl.attachShader(program, compileShader(gl, gl.VERTEX_SHADER, WARP_VERT))
+      gl.attachShader(program, compileShader(gl, gl.FRAGMENT_SHADER, WARP_FRAG))
+      gl.linkProgram(program)
+      if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
+        throw new Error(gl.getProgramInfoLog(program) || 'program 链接失败')
+      }
+      gl.useProgram(program)
+
+      // 全屏四边形（两个三角形）—— 顶点直接给裁剪空间坐标
+      const buf = gl.createBuffer()
+      gl.bindBuffer(gl.ARRAY_BUFFER, buf)
+      gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([
+        -1, -1, 1, -1, -1, 1,
+        -1, 1, 1, -1, 1, 1,
+      ]), gl.STATIC_DRAW)
+      const aPos = gl.getAttribLocation(program, 'aPos')
+      gl.enableVertexAttribArray(aPos)
+      gl.vertexAttribPointer(aPos, 2, gl.FLOAT, false, 0, 0)
+
+      // 场景纹理：边缘夹取（别让畸变把画面外绕回来）+ 线性过滤（本来就是模糊的光）
+      const tex = gl.createTexture()
+      gl.bindTexture(gl.TEXTURE_2D, tex)
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE)
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE)
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR)
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR)
+      // canvas 的 Y 轴朝下、纹理坐标朝上 → 上传前翻一下，否则整幅画面上下颠倒
+      gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true)
+
+      this._gl = gl
+      this._warp = canvas
+      this._warpTex = tex
+      this._uBarrel = gl.getUniformLocation(program, 'uBarrel')
+      this._uAberration = gl.getUniformLocation(program, 'uAberration')
+      gl.uniform1i(gl.getUniformLocation(program, 'uScene'), 0)
+
+      canvas.width = this.canvas.width
+      canvas.height = this.canvas.height
+    } catch (err) {
+      // 记一笔但**不抛**：调用方看到 false 就走直接贴图，画面照样出得来
+      this._glFailed = true
+      this._gl = null
+      this._warp = null
+    }
+  }
+
+  /** 把离屏场景经桶形 + 色散后处理后贴回可见画布。 */
+  _presentWarp() {
+    const gl = this._gl
+    if (!gl || !this._warp) return
+    const w = this.canvas.width
+    const h = this.canvas.height
+    if (this._warp.width !== w || this._warp.height !== h) {
+      this._warp.width = w
+      this._warp.height = h
+    }
+    gl.viewport(0, 0, w, h)
+    gl.clearColor(0, 0, 0, 0)
+    gl.clear(gl.COLOR_BUFFER_BIT)
+
+    gl.activeTexture(gl.TEXTURE0)
+    gl.bindTexture(gl.TEXTURE_2D, this._warpTex)
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, this._scene)
+
+    // 0~100 → 0~满量程（BARREL_MAX / ABERRATION_MAX 是调过的"看起来够但不至于糊"的档位）
+    gl.uniform1f(this._uBarrel, (clamp(this.appearance.barrel ?? 0, 0, 100) / 100) * BARREL_MAX)
+    gl.uniform1f(this._uAberration, (clamp(this.appearance.aberration ?? 0, 0, 100) / 100) * ABERRATION_MAX)
+    gl.drawArrays(gl.TRIANGLES, 0, 6)
+
+    // 贴回可见画布的 2D 上下文
+    const ctx = this.ctx
+    ctx.setTransform(1, 0, 0, 1, 0, 0)
+    ctx.globalCompositeOperation = 'source-over'
+    ctx.globalAlpha = 1
+    ctx.clearRect(0, 0, w, h)
+    ctx.drawImage(this._warp, 0, 0)
   }
 
   // ------------------------------------------------------------------ 主循环
@@ -390,7 +556,11 @@ export class SpectrumView {
 
   // ------------------------------------------------------------------ 绘制
   _draw(dt) {
-    const ctx = this.ctx
+    // 开了桶形/色散（后处理）就把场景画到**离屏**，再用 WebGL 变形贴回可见画布；
+    // 没开就直接画在可见画布上（不多一步全屏拷贝）。
+    const post = this._postEnabled()
+    const scene = post ? this._scene : this.canvas
+    const ctx = post ? this._sceneCtx : this.ctx
     const { cx, cy, radiusBase, maxLen, radiusOuter } = this._geometry()
     const count = this.shown.length
     const palette = this._paletteFor(count)
@@ -487,7 +657,7 @@ export class SpectrumView {
     // === 3) 主画布：清空 → 贴余晖层 → 画中心（同心环 + 标签；静止，不参与拖尾）===
     ctx.setTransform(1, 0, 0, 1, 0, 0)
     ctx.globalCompositeOperation = 'source-over'
-    ctx.clearRect(0, 0, this.canvas.width, this.canvas.height)
+    ctx.clearRect(0, 0, scene.width, scene.height)
     ctx.drawImage(this._trail, 0, 0)
 
     ctx.setTransform(this._dpr, 0, 0, this._dpr, 0, 0)
@@ -501,14 +671,17 @@ export class SpectrumView {
     bctx.setTransform(1, 0, 0, 1, 0, 0)
     bctx.globalCompositeOperation = 'copy'
     bctx.filter = 'blur(2px)'
-    bctx.drawImage(this.canvas, 0, 0, this._bw, this._bh)
+    bctx.drawImage(scene, 0, 0, this._bw, this._bh)
     bctx.filter = 'none'
 
     ctx.globalCompositeOperation = 'lighter'
     ctx.globalAlpha = 0.85
-    ctx.drawImage(this._bloom, 0, 0, this.canvas.width, this.canvas.height)
+    ctx.drawImage(this._bloom, 0, 0, scene.width, scene.height)
     ctx.globalAlpha = 1
     ctx.globalCompositeOperation = 'source-over'
+
+    // 后处理（桶形 / RGB 分色）：把离屏场景经 WebGL 变形后贴回可见画布
+    if (post) this._presentWarp()
   }
 
   /** 中心：一圈套一圈的**同心环**（不填充）+ X 形油光 + 标签（用自定义色）；随低频轻微起伏。 */

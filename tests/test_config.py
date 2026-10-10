@@ -7,9 +7,10 @@ import json
 import pytest
 
 from app.config import (
-    AFTERGLOW_RANGE, AUDIO_SOURCES, BG_OPACITY_RANGE, COUNT_RANGE, DELAY_RANGE, HEIGHT_RANGE,
-    INTENSITY_RANGE, MIX_RANGE, MODES, PARTICLE_RANGE, SENSITIVITY_RANGE, SIZE_RANGE,
-    ConfigError, ConfigStore, appearance_of, audio_of, default_config, render_of, validate,
+    AFTERGLOW_RANGE, AUDIO_SOURCES, BG_OPACITY_RANGE, COUNT_RANGE, CRT_FX_RANGE, DELAY_RANGE,
+    HEIGHT_RANGE, INTENSITY_RANGE, MIX_RANGE, MODES, PARTICLE_RANGE, SENSITIVITY_RANGE,
+    SIZE_RANGE, ConfigError, ConfigStore, appearance_of, audio_of, default_config, render_of,
+    validate,
 )
 
 
@@ -181,6 +182,17 @@ def test_afterglow_default_and_range() -> None:
     with pytest.raises(ConfigError):
         validate({"appearance": {"afterglow": AFTERGLOW_RANGE[1] + 1}})
     assert validate({"appearance": {"afterglow": 0}})["appearance"]["afterglow"] == 0
+
+
+def test_crt_fx_defaults_and_validation() -> None:
+    appearance = default_config()["appearance"]
+    for key in ("barrel", "aberration"):
+        assert CRT_FX_RANGE[0] <= appearance[key] <= CRT_FX_RANGE[1]
+    for key in ("barrel", "aberration"):
+        with pytest.raises(ConfigError):
+            validate({"appearance": {key: CRT_FX_RANGE[1] + 1}})
+    # 0 = 关，是合法值
+    assert validate({"appearance": {"barrel": 0}}) ["appearance"]["barrel"] == 0
 
 
 def test_particles_defaults_and_validation() -> None:

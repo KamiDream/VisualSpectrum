@@ -28,6 +28,8 @@
         "bg_opacity": 0,       # 背景不透明度（0~100，0 = 全透明）
         "crt": true,           # CRT 扫描线 / 暗角效果（只在 bg_opacity > 0 时可开）
         "afterglow": 60,       # 余晖（荧光拖尾）强度（0~100，0 = 不留余晖）
+        "barrel": 15,          # 桶形畸变强度（WebGL）（0~100，0 = 关）
+        "aberration": 30,      # RGB 分色 / 色散强度（0~100，0 = 关）
         "particle_speed": 100, # 散射粒子速度倍数（20~400）
         "particle_life": 100,  # 散射粒子寿命倍数（20~400）
         "burst": true,         # 鼓点全屏扩散粒子（开关）
@@ -62,7 +64,8 @@ from . import paths
 __all__ = [
     "VERSION", "MODES", "AUDIO_SOURCES",
     "SIZE_RANGE", "COUNT_RANGE", "HEIGHT_RANGE", "INTENSITY_RANGE", "DELAY_RANGE",
-    "BG_OPACITY_RANGE", "AFTERGLOW_RANGE", "COLORS_MAX", "DEFAULT_COLORS",
+    "MIX_RANGE", "BG_OPACITY_RANGE", "AFTERGLOW_RANGE", "PARTICLE_RANGE",
+    "SENSITIVITY_RANGE", "CRT_FX_RANGE", "COLORS_MAX", "DEFAULT_COLORS",
     "ConfigError", "ConfigStore", "ReloadResult",
     "default_config", "validate", "appearance_of", "audio_of", "render_of",
 ]
@@ -108,6 +111,9 @@ PARTICLE_RANGE = (20, 400)
 
 #: 鼓点灵敏度（0~100）。越大越容易触发。
 SENSITIVITY_RANGE = (0, 100)
+
+#: CRT 后处理效果（桶形畸变 / RGB 分色）的强度范围（0~100）。0 = 关。
+CRT_FX_RANGE = (0, 100)
 
 #: 颜色：一段**按频率从低到高**排列的色标（至少 1 个，最多 8 个），
 #: 渲染时在色标之间插值 —— 于是"每个频率都有它自己的颜色"。
@@ -156,6 +162,8 @@ def default_config() -> dict[str, Any]:
             "bg_opacity": 0,
             "crt": True,
             "afterglow": 60,
+            "barrel": 15,
+            "aberration": 30,
             "particle_speed": 100,
             "particle_life": 100,
             "burst": True,
@@ -252,6 +260,9 @@ def _validate_appearance(raw: Any) -> dict[str, Any]:
     if "afterglow" in data:
         out["afterglow"] = _as_int(data["afterglow"], "appearance.afterglow",
                                    *AFTERGLOW_RANGE)
+    for key in ("barrel", "aberration"):
+        if key in data:
+            out[key] = _as_int(data[key], f"appearance.{key}", *CRT_FX_RANGE)
     for key in ("particle_speed", "particle_life", "burst_speed", "burst_life"):
         if key in data:
             out[key] = _as_int(data[key], f"appearance.{key}", *PARTICLE_RANGE)
