@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=VisualSpectrum
+Comment=环形频谱可视化
+Exec=visualspectrum
+Icon=visualspectrum
+Terminal=false
+Categories=AudioVideo;Audio;Graphics;
+StartupNotify=false

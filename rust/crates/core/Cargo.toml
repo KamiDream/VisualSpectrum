@@ -1,0 +1,13 @@
+[package]
+name = "vs-core"
+description = "VisualSpectrum 的纯逻辑核心：频段分析（FFT）+ 配置 schema / 校验 / 存取"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+# 配置的 JSON 序列化 / 反序列化（字段名与 Python 版完全一致，web 配置页零改动）。
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+# 纯 Rust FFT（不依赖系统库 / FFTW），和 numpy 的 rfft 对齐。
+rustfft = "6"

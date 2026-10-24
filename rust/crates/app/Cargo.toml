@@ -1,0 +1,27 @@
+[package]
+name = "vs-app"
+description = "VisualSpectrum 桌面端（原生窗口 + wgpu 渲染）"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[[bin]]
+name = "visualspectrum"
+path = "src/main.rs"
+
+[dependencies]
+vs-core = { path = "../core" }
+vs-audio = { path = "../audio" }
+vs-scene = { path = "../scene" }
+vs-server = { path = "../server" }
+
+winit = "0.30"
+wgpu = "30"
+pollster = "0.4"
+bytemuck = { version = "1", features = ["derive"] }
+# 托盘：StatusNotifierItem（纯 Rust + zbus，不依赖 GTK）
+ksni = { version = "0.3", features = ["blocking"] }
+
+[dev-dependencies]
+# 只用来在无显示器的环境里校验 WGSL（naga 是 wgpu 自带的着色器编译器）。
+naga = { version = "30", features = ["wgsl-in"] }

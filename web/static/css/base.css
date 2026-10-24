@@ -239,23 +239,22 @@ body::before {
 
 /* ------------------------------------------------------------------ 布局 */
 
-/* 卡片里：左设置面板 / 右实时预览，两列等高、各自滚动 */
+/* 卡片里：设置面板占满整宽（已去掉实时预览） */
 .layout {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) min(440px, 44%);
+  grid-template-columns: minmax(0, 1fr);
   gap: 18px;
   padding: 0 20px 20px;
-  align-items: stretch;
   flex: 1 1 auto;
   min-height: 0;
   min-width: 0;
 }
 .layout > * { min-width: 0; min-height: 0; }
-.layout > .panel, .layout > .preview { overflow-y: auto; }
+.layout > .panel { overflow-y: auto; }
 
 @media (max-width: 1120px) {
-  .layout { grid-template-columns: minmax(0, 1fr); flex: 0 0 auto; }
-  .layout > .panel, .layout > .preview { overflow-y: visible; }
+  .layout { flex: 0 0 auto; }
+  .layout > .panel { overflow-y: visible; }
   .content-card { overflow-y: auto; }
 }
 
@@ -491,53 +490,10 @@ input[type="color"]::-moz-color-swatch { border: none; border-radius: 7px; }
 .switch:has(input:disabled) { cursor: not-allowed; opacity: .6; }
 .switch-text { color: var(--muted); font-size: 12px; }
 
-/* ------------------------------------------------------------------ 预览 */
+/* ------------------------------------------------------------------ 通用文字 */
 
-.preview { display: flex; flex-direction: column; }
-.preview-head {
-  display: flex; align-items: center; justify-content: space-between;
-  gap: 12px; flex-wrap: wrap;
-}
 .muted { color: var(--muted); }
 .small { font-size: 12px; }
-
-#preview-status.demo { color: var(--magenta); }
-#preview-status.error { color: var(--danger); }
-
-.preview-stage {
-  position: relative;
-  flex: 1 1 auto;
-  margin: 14px 0 12px;
-  border-radius: 14px;
-  overflow: hidden;
-  aspect-ratio: 16 / 10;
-  min-height: 300px;
-  border: 1px solid var(--line);
-  /* 背景分两层：上面是用户设的**纯色**（`--vs-bg`，没设就是透明），底下是**棋盘格**。
-     棋盘格是"透明"的通用示意 —— 不透明度 0 时只看得见棋盘格，不会假装有颜色。 */
-  background-image:
-    linear-gradient(var(--vs-bg, transparent), var(--vs-bg, transparent)),
-    conic-gradient(#161c28 0 25%, #0e131d 0 50%, #161c28 0 75%, #0e131d 0);
-  background-size: auto, 22px 22px;
-}
-#preview-canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
-
-/* 预览里的 CRT 扫描线（与浮层那张 `overlay.css` 同款，只是淡一些） */
-.preview-crt {
-  display: none;                  /* 只在设了背景时才显示（同浮层的 `.crt`） */
-  position: absolute; inset: 0; pointer-events: none;
-  background-image: repeating-linear-gradient(
-    to bottom,
-    rgba(120, 232, 255, 0.045) 0px,
-    rgba(120, 232, 255, 0.045) 1px,
-    transparent 1px,
-    transparent 3px
-  );
-  box-shadow: inset 0 0 70px 14px rgba(0, 0, 0, 0.5);
-  mix-blend-mode: screen;
-}
-
-.preview-stage.crt-on .preview-crt { display: block; }
 
 /* ------------------------------------------------------------------ 侧栏均衡器 */
 

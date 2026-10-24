@@ -39,6 +39,4 @@ export const api = {
   validate: (config) => sendJSON('POST', '/api/config/validate', config),
   reset: () => sendJSON('POST', '/api/config/reset'),
   reload: () => sendJSON('POST', '/api/reload', {}),
-  overlay: (visible) => sendJSON('POST', '/api/overlay',
-    visible === undefined ? {} : { visible }),
 }

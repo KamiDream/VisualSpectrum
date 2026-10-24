@@ -1,0 +1,16 @@
+[workspace]
+resolver = "2"
+members = ["crates/core", "crates/audio", "crates/scene", "crates/server", "crates/app"]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+authors = ["VisualSpectrum"]
+rust-version = "1.80"
+
+# 发布构建统一开优化（体积/速度）；调试构建保留符号便于排查。
+[profile.release]
+opt-level = 3
+lto = "thin"
+codegen-units = 1

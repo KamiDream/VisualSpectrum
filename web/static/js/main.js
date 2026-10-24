@@ -3,7 +3,7 @@
  *
  * 就三件事：
  *   1. 拉 `/api/meta` + `/api/config`，把三项设置（大小 / 数量 / 模式）填进控件；
- *   2. 控件一变就更新内存里的配置、标"有未保存改动"、并**立刻反映到实时预览**上；
+ *   2. 控件一变就更新内存里的配置、标"有未保存改动"；
  *   3. 「保存并生效」把整份配置 PUT 回后端（后端会当场让桌面浮层用上）。
  *
  * 没有构建步骤、没有任何依赖：浏览器直接吃 ES 模块，断网也能用。
@@ -11,8 +11,6 @@
 
 import { $, clamp, esc } from './lib/dom.js'
 import { api } from './lib/api.js'
-import { mountPreview } from './lib/preview.js'
-import { backgroundCss, crtOn } from './lib/spectrum.js'
 
 const state = {
   config: null,
@@ -37,8 +35,9 @@ const els = {
   midVal: $('#mid-val'),
   treble: $('#treble'),
   trebleVal: $('#treble-val'),
-  mixReadout: $('#mix-readout'),
   rotate: $('#rotate'),
+  rotateSpeed: $('#rotate-speed'),
+  rotateSpeedVal: $('#rotate-speed-val'),
   link: $('#link'),
   sources: [...document.querySelectorAll('[data-source]')],
   delay: $('#delay'),
@@ -46,6 +45,8 @@ const els = {
   device: $('#device'),
   deviceNote: $('#device-note'),
   colors: $('#colors'),
+  centerGlow: $('#center-glow'),
+  centerGlowVal: $('#center-glow-val'),
   addColor: $('#add-color'),
   settingsTabs: $('#settings-tabs'),
   pageTitle: $('#page-title'),
@@ -71,18 +72,12 @@ const els = {
   burstLife: $('#burst-life'),
   burstLifeVal: $('#burst-life-val'),
   highFps: $('#high-fps'),
-  previewStage: $('.preview-stage'),
   modes: [...document.querySelectorAll('[data-mode]')],
   save: $('#btn-save'),
   reload: $('#btn-reload'),
   reset: $('#btn-reset'),
-  overlay: $('#btn-overlay'),
   status: $('#status'),
-  previewStatus: $('#preview-status'),
-  canvas: $('#preview-canvas'),
 }
-
-let preview = null
 
 /* ------------------------------------------------------------------ 设置 */
 
@@ -93,6 +88,8 @@ function applyMeta() {
   const [heightLo, heightHi] = state.meta.limits.height ?? [10, 90]
   const [intensityLo, intensityHi] = state.meta.limits.intensity ?? [20, 400]
   const [delayLo, delayHi] = state.meta.limits.delay ?? [0, 10000]
+  const [rotateSpeedLo, rotateSpeedHi] = state.meta.limits.rotate_speed ?? [10, 300]
+  const [centerGlowLo, centerGlowHi] = state.meta.limits.center_glow ?? [0, 200]
   els.size.min = sizeLo
   els.size.max = sizeHi
   els.count.min = countLo
@@ -104,6 +101,10 @@ function applyMeta() {
   els.intensity.max = intensityHi
   els.delay.min = delayLo
   els.delay.max = delayHi
+  els.rotateSpeed.min = rotateSpeedLo
+  els.rotateSpeed.max = rotateSpeedHi
+  els.centerGlow.min = centerGlowLo
+  els.centerGlow.max = centerGlowHi
 }
 
 function renderForm() {
@@ -121,11 +122,14 @@ function renderForm() {
     els[`${key}Val`].textContent = `${appearance[key]}%`
   }
   els.rotate.checked = appearance.rotate !== false
+  els.rotateSpeed.value = appearance.rotate_speed ?? 100
+  els.rotateSpeedVal.textContent = `${appearance.rotate_speed ?? 100}%`
   els.link.checked = appearance.link !== false
+  els.centerGlow.value = appearance.center_glow ?? 60
+  els.centerGlowVal.textContent = `${appearance.center_glow ?? 60}%`
   for (const button of els.modes) {
     button.classList.toggle('on', button.dataset.mode === appearance.mode)
   }
-  if (preview) preview.setAppearance(appearance)
 
   const audio = state.config.audio
   for (const button of els.sources) {
@@ -146,7 +150,6 @@ function renderForm() {
   els.barrelVal.textContent = `${appearance.barrel ?? 15}%`
   els.aberration.value = appearance.aberration ?? 30
   els.aberrationVal.textContent = `${appearance.aberration ?? 30}%`
-  applyPreviewBackground()
   els.particleSpeed.value = appearance.particle_speed ?? 100
   els.particleSpeedVal.textContent = `${appearance.particle_speed ?? 100}%`
   els.particleLife.value = appearance.particle_life ?? 100
@@ -160,16 +163,19 @@ function renderForm() {
   els.burstLifeVal.textContent = `${appearance.burst_life ?? 100}%`
   updateBurstDisabled()
   els.highFps.checked = Boolean(state.config.render?.high_fps)
-  renderOverlayButton()
 }
 
-/** 刷新「显示 / 隐藏可视化」按钮 —— 它对应桌面浮层的显示状态（来自 meta）。 */
-function renderOverlayButton() {
-  if (!els.overlay) return
-  const visible = state.meta?.overlay_visible
-  const known = typeof visible === 'boolean'
-  els.overlay.disabled = !known                 // 配置页独立运行时没有浮层可控制
-  els.overlay.textContent = (known && visible) ? '隐藏可视化' : '显示可视化'
+/** 按滑杆自己的 min/max 夹值。
+ *  范围的唯一来源是后端 `/api/meta` 的 limits（由 `applyMeta()` 写进 DOM）；
+ *  以前在事件里另写一份 10~100 / 10~90 / 20~400，结果滑到中段数值就不动了。 */
+function clampInput(input) {
+  const lo = Number(input.min)
+  const hi = Number(input.max)
+  return clamp(
+    Number(input.value),
+    Number.isFinite(lo) ? lo : 0,
+    Number.isFinite(hi) ? hi : 100,
+  )
 }
 
 /** 鼓点开关关掉时，它下面那三个滑杆都禁用。 */
@@ -178,16 +184,6 @@ function updateBurstDisabled() {
   els.burstSensitivity.disabled = off
   els.burstSpeed.disabled = off
   els.burstLife.disabled = off
-}
-
-/** 把背景（颜色 + 不透明度）应用到预览区（浮层那边由 overlay.js 自己设 `--vs-bg`）。 */
-function applyPreviewBackground() {
-  if (!els.previewStage || !state.config) return
-  const appearance = state.config.appearance
-  const bg = backgroundCss(appearance)
-  if (bg) els.previewStage.style.setProperty('--vs-bg', bg)
-  else els.previewStage.style.removeProperty('--vs-bg')
-  els.previewStage.classList.toggle('crt-on', crtOn(appearance))   // CRT 覆盖层只在有背景时可开
 }
 
 /** 画颜色色标编辑器（一列 <input type="color">，可加 / 可删）。 */
@@ -299,7 +295,6 @@ async function refreshMeta() {
     state.meta = await api.meta()
     applyMeta()
     renderStatus()
-    renderOverlayButton()
   } catch (error) {
     /* meta 拿不到不影响设置面板 */
   }
@@ -338,27 +333,24 @@ function wire() {
 
   els.size.addEventListener('input', () => {
     if (!state.config) return
-    state.config.appearance.size = clamp(Number(els.size.value), 10, 100)
+    state.config.appearance.size = clampInput(els.size)
     els.sizeVal.textContent = `${state.config.appearance.size}%`
-    if (preview) preview.setAppearance(state.config.appearance)
     state.dirty = true
     renderStatus()
   })
 
   els.count.addEventListener('input', () => {
     if (!state.config) return
-    state.config.appearance.count = clamp(Number(els.count.value), 1, 512)
+    state.config.appearance.count = clampInput(els.count)
     els.countVal.textContent = `${state.config.appearance.count}`
-    if (preview) preview.setAppearance(state.config.appearance)
     state.dirty = true
     renderStatus()
   })
 
   els.height.addEventListener('input', () => {
     if (!state.config) return
-    state.config.appearance.height = clamp(Number(els.height.value), 10, 90)
+    state.config.appearance.height = clampInput(els.height)
     els.heightVal.textContent = `${state.config.appearance.height}%`
-    if (preview) preview.setAppearance(state.config.appearance)
     state.dirty = true
     renderStatus()
   })
@@ -366,28 +358,41 @@ function wire() {
   els.rotate.addEventListener('change', () => {
     if (!state.config) return
     state.config.appearance.rotate = els.rotate.checked
-    if (preview) preview.setAppearance(state.config.appearance)
+    state.dirty = true
+    renderStatus()
+  })
+
+  els.rotateSpeed.addEventListener('input', () => {
+    if (!state.config) return
+    state.config.appearance.rotate_speed = clampInput(els.rotateSpeed)
+    els.rotateSpeedVal.textContent = `${state.config.appearance.rotate_speed}%`
+    state.dirty = true
+    renderStatus()
+  })
+
+  els.centerGlow.addEventListener('input', () => {
+    if (!state.config) return
+    state.config.appearance.center_glow = clampInput(els.centerGlow)
+    els.centerGlowVal.textContent = `${state.config.appearance.center_glow}%`
     state.dirty = true
     renderStatus()
   })
 
   els.intensity.addEventListener('input', () => {
     if (!state.config) return
-    state.config.appearance.intensity = clamp(Number(els.intensity.value), 20, 400)
+    state.config.appearance.intensity = clampInput(els.intensity)
     els.intensityVal.textContent = `${state.config.appearance.intensity}%`
-    if (preview) preview.setAppearance(state.config.appearance)
     state.dirty = true
     renderStatus()
   })
 
-  //: 低/中/高占比是**在 Python 侧**生效的（各自归一化后再乘），所以保存后才看得出来 ——
-  //: 这里不调 preview.setAppearance。
+  //: 低/中/高占比在音频侧生效，保存后才看得出来。
   for (const key of ['bass', 'mid', 'treble']) {
     const input = els[key]
     const output = els[`${key}Val`]
     input.addEventListener('input', () => {
       if (!state.config) return
-      state.config.appearance[key] = clamp(Number(input.value), 0, 400)
+      state.config.appearance[key] = clampInput(input)
       output.textContent = `${state.config.appearance[key]}%`
       state.dirty = true
       renderStatus()
@@ -397,7 +402,6 @@ function wire() {
   els.link.addEventListener('change', () => {
     if (!state.config) return
     state.config.appearance.link = els.link.checked
-    if (preview) preview.setAppearance(state.config.appearance)
     state.dirty = true
     renderStatus()
   })
@@ -414,7 +418,7 @@ function wire() {
 
   els.delay.addEventListener('input', () => {
     if (!state.config) return
-    state.config.audio.delay_ms = clamp(Number(els.delay.value), 0, 10000)
+    state.config.audio.delay_ms = clampInput(els.delay)
     els.delayVal.textContent = `${state.config.audio.delay_ms}ms`
     state.dirty = true
     renderStatus()
@@ -432,7 +436,6 @@ function wire() {
     const input = event.target.closest('input[type="color"]')
     if (!input || !state.config) return
     state.config.appearance.colors[Number(input.dataset.index)] = input.value.toUpperCase()
-    if (preview) preview.setAppearance(state.config.appearance)
     state.dirty = true
     renderStatus()
   })
@@ -444,7 +447,6 @@ function wire() {
     if (colors.length <= 1) return
     colors.splice(Number(del.dataset.index), 1)
     renderColors()
-    if (preview) preview.setAppearance(state.config.appearance)
     state.dirty = true
     renderStatus()
   })
@@ -458,7 +460,6 @@ function wire() {
     }
     colors.push(colors[colors.length - 1] ?? '#7EE7FF')
     renderColors()
-    if (preview) preview.setAppearance(state.config.appearance)
     state.dirty = true
     renderStatus()
   })
@@ -466,17 +467,15 @@ function wire() {
   els.bgColor.addEventListener('input', () => {
     if (!state.config) return
     state.config.appearance.bg_color = els.bgColor.value.toUpperCase()
-    applyPreviewBackground()
     state.dirty = true
     renderStatus()
   })
 
   els.bgOpacity.addEventListener('input', () => {
     if (!state.config) return
-    state.config.appearance.bg_opacity = clamp(Number(els.bgOpacity.value), 0, 100)
+    state.config.appearance.bg_opacity = clampInput(els.bgOpacity)
     els.bgOpacityVal.textContent = `${state.config.appearance.bg_opacity}%`
     els.crt.disabled = state.config.appearance.bg_opacity <= 0
-    applyPreviewBackground()
     state.dirty = true
     renderStatus()
   })
@@ -484,45 +483,40 @@ function wire() {
   els.crt.addEventListener('change', () => {
     if (!state.config) return
     state.config.appearance.crt = els.crt.checked
-    applyPreviewBackground()
     state.dirty = true
     renderStatus()
   })
 
   els.afterglow.addEventListener('input', () => {
     if (!state.config) return
-    state.config.appearance.afterglow = clamp(Number(els.afterglow.value), 0, 100)
+    state.config.appearance.afterglow = clampInput(els.afterglow)
     els.afterglowVal.textContent = `${state.config.appearance.afterglow}%`
-    if (preview) preview.setAppearance(state.config.appearance)   // 余晖是画布效果，预览可直接看
     state.dirty = true
     renderStatus()
   })
 
-  //: 粒子（散射 / 鼓点）也都是画布效果 —— 改完预览直接看得到。
-  const bindParticle = (input, output, key, lo, hi) => {
+  //: 粒子（散射 / 鼓点）与 CRT 参数都走滑杆自己的范围。
+  const bindRange = (input, output, key) => {
     input.addEventListener('input', () => {
       if (!state.config) return
-      state.config.appearance[key] = clamp(Number(input.value), lo, hi)
+      state.config.appearance[key] = clampInput(input)
       output.textContent = `${state.config.appearance[key]}%`
-      if (preview) preview.setAppearance(state.config.appearance)
       state.dirty = true
       renderStatus()
     })
   }
-  bindParticle(els.particleSpeed, els.particleSpeedVal, 'particle_speed', 20, 400)
-  bindParticle(els.particleLife, els.particleLifeVal, 'particle_life', 20, 400)
-  bindParticle(els.burstSpeed, els.burstSpeedVal, 'burst_speed', 20, 400)
-  bindParticle(els.burstLife, els.burstLifeVal, 'burst_life', 20, 400)
-  bindParticle(els.burstSensitivity, els.burstSensitivityVal, 'burst_sensitivity', 0, 100)
-  // 桶形畸变 / RGB 分色也是画布效果（WebGL 后处理）—— 预览直接看得到。
-  bindParticle(els.barrel, els.barrelVal, 'barrel', 0, 100)
-  bindParticle(els.aberration, els.aberrationVal, 'aberration', 0, 100)
+  bindRange(els.particleSpeed, els.particleSpeedVal, 'particle_speed')
+  bindRange(els.particleLife, els.particleLifeVal, 'particle_life')
+  bindRange(els.burstSpeed, els.burstSpeedVal, 'burst_speed')
+  bindRange(els.burstLife, els.burstLifeVal, 'burst_life')
+  bindRange(els.burstSensitivity, els.burstSensitivityVal, 'burst_sensitivity')
+  bindRange(els.barrel, els.barrelVal, 'barrel')
+  bindRange(els.aberration, els.aberrationVal, 'aberration')
 
   els.burst.addEventListener('change', () => {
     if (!state.config) return
     state.config.appearance.burst = els.burst.checked
     updateBurstDisabled()
-    if (preview) preview.setAppearance(state.config.appearance)
     state.dirty = true
     renderStatus()
   })
@@ -552,21 +546,6 @@ function wire() {
   })
   els.reload.addEventListener('click', () => void reload().catch((e) => showToast(e.message, 'error')))
   els.reset.addEventListener('click', () => void reset().catch((e) => showToast(e.message, 'error')))
-
-  //: 显示 / 隐藏桌面浮层 —— **关了可视化窗口后从这儿再唤回来**（不必重启程序）。
-  els.overlay?.addEventListener('click', async () => {
-    const visible = state.meta?.overlay_visible
-    if (typeof visible !== 'boolean') return
-    try {
-      await api.overlay(!visible)
-      // 后端只是把请求排到主线程 —— 稍等一下再拉状态，免得读到旧的。
-      await new Promise((resolve) => setTimeout(resolve, 200))
-      await refreshMeta()
-      showToast(visible ? '已隐藏可视化' : '已显示可视化', 'info')
-    } catch (error) {
-      showToast(error.message, 'error')
-    }
-  })
 }
 
 /* ------------------------------------------------------------------ 启动 */
@@ -580,8 +559,7 @@ async function main() {
     state.config = config.config
     state.saved = config.config
   } catch (error) {
-    $('#preview-status').textContent = `连不上后端：${error.message}`
-    $('#preview-status').classList.add('error')
+    els.status.textContent = `连不上后端：${error.message}`
     return
   }
 
@@ -589,19 +567,6 @@ async function main() {
   renderForm()
   renderStatus()
   await loadDevices()
-
-  preview = mountPreview(els.canvas, {
-    onStatus: ({ live, source, mix }) => {
-      els.previewStatus.textContent = live ? `实时音频 · ${source}` : `演示波形 · ${source}`
-      els.previewStatus.classList.toggle('demo', !live)
-      if (mix) {
-        const pct = (value) => `${Math.round(value * 100)}%`
-        els.mixReadout.textContent =
-          `低 / 中 / 高音占比：${pct(mix.bass)} · ${pct(mix.mid)} · ${pct(mix.treble)}`
-      }
-    },
-  })
-  preview.setAppearance(state.config.appearance)
 
   if (state.meta.platform) {
     document.body.dataset.session = state.meta.platform.session

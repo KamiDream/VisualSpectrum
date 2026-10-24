@@ -1,6 +1,0 @@
-# VisualSpectrum —— 开发/测试依赖
-#
-#   python -m pip install -r requirements-dev.txt
-
-pytest>=8.0
-ruff>=0.6

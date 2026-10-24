@@ -123,7 +123,6 @@
           </div>
           <div class="page-title" id="page-title">显示</div>
           <header class="toolbar">
-            <button id="btn-overlay" class="btn" title="显示 / 隐藏桌面上的可视化浮层">隐藏可视化</button>
             <button id="btn-save" class="btn primary" disabled>保存并生效</button>
             <button id="btn-reload" class="btn">重新载入</button>
             <button id="btn-reset" class="btn danger">恢复默认</button>
@@ -202,6 +201,17 @@
                     只留 1 个色就是单色。
                   </p>
                 </div>
+
+                <div class="field">
+                  <div class="field-head">
+                    <label for="center-glow">中心光晕</label>
+                    <output id="center-glow-val">60%</output>
+                  </div>
+                  <input id="center-glow" type="range" min="0" max="200" value="60">
+                  <p class="field-hint">
+                    中心同心环外的光晕 + X 形油光的强度；环线与中心标签的亮度不受影响。
+                  </p>
+                </div>
               </div>
 
               <!-- ===== 动效 ===== -->
@@ -214,6 +224,15 @@
                     <span class="switch-track"><span class="switch-thumb"></span></span>
                     <span class="switch-text">整圈缓慢自转（关掉就定格）</span>
                   </label>
+                </div>
+
+                <div class="field">
+                  <div class="field-head">
+                    <label for="rotate-speed">旋转 · 速度</label>
+                    <output id="rotate-speed-val">100%</output>
+                  </div>
+                  <input id="rotate-speed" type="range" min="10" max="300" value="100">
+                  <p class="field-hint">100% ≈ 16 秒一圈；越大转得越快（关掉旋转时无效）。</p>
                 </div>
 
                 <div class="field">
@@ -402,26 +421,11 @@
                     <span class="switch-track"><span class="switch-thumb"></span></span>
                     <span class="switch-text">解锁帧率上限（高刷屏到 120fps）</span>
                   </label>
-                  <p class="field-hint">⚠ 改这一项要**重启**才生效（Chromium 参数在启动时读一次）。</p>
+                  <p class="field-hint">⚠ 保存后立即生效（无需重启）。</p>
                 </div>
               </div>
             </div>
           </section>
-
-          <aside class="preview">
-            <div class="preview-head">
-              <h2 class="panel-title"><span class="title-glyph" aria-hidden="true">♫</span> 实时预览</h2>
-              <p class="muted" id="preview-status">正在连接…</p>
-            </div>
-            <p class="muted small" id="mix-readout">低 / 中 / 高音占比：—</p>
-            <div class="preview-stage">
-              <canvas id="preview-canvas"></canvas>
-              <div class="preview-crt" aria-hidden="true"></div>
-            </div>
-            <p class="muted small">
-              预览与桌面浮层**共用同一份渲染代码**，并显示真实音频的实时频谱。
-            </p>
-          </aside>
         </main>
       </div>
     </div>

@@ -1,16 +1,6 @@
-# VisualSpectrum
-__pycache__/
-*.py[cod]
-*.egg-info/
-.pytest_cache/
-.ruff_cache/
+# Rust
+rust/target/
+.cargo/
 
 # 运行期产物
-logs/
-dist/
-build/
 *.log
-
-# 虚拟环境
-.venv/
-venv/

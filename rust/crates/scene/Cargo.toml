@@ -1,0 +1,9 @@
+[package]
+name = "vs-scene"
+description = "VisualSpectrum 的场景状态机：几何 / 色标 / 粒子 / 鼓点 / 自转（与渲染后端无关）"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+vs-core = { path = "../core" }
